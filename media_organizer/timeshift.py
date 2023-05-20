@@ -1,6 +1,6 @@
 """Functions for adjusting the capture datetime of media files (photos and videos) based on a source of truth."""
 from dataclasses import dataclass
-from typing import Union, List
+from typing import Union, List, Optional, Dict
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
@@ -40,8 +40,15 @@ class ExifDateTimeField:
             date = date.astimezone(timezone.utc)
         return date.strftime(self.format)
 
+    def __hash__(self):
+        return hash(self.name)
 
-# Order matters.
+    def __eq__(self, other):
+        if isinstance(other, ExifDateTimeTag):
+            return self.name == other.name
+        return False
+
+
 PHOTO_DATETIME_FIELDS = [
     ExifDateTimeField("EXIF:ModifyDate"),
     ExifDateTimeField("EXIF:DateTimeOriginal"),
@@ -80,9 +87,16 @@ def extract_metadata_using_exiftool(file_path: Union[Path, str]) -> dict:
     return metadata
 
 
-def determine_timezone(file_path: Union[Path, str]) -> timezone:
-    file_path = _format_file_path(file_path)
-    metadata = extract_metadata_using_exiftool(file_path)
+def determine_timezone(
+    file_path: Optional[Union[Path, str]] = None,
+    metadata: Optional[Dict[str, str]] = None,
+) -> timezone:
+    """Determine the timezone of a media file based on its metadata."""
+    if file_path is None and metadata is None:
+        raise ValueError("Either file_path or metadata must be provided.")
+    if metadata is None:
+        file_path = _format_file_path(file_path)
+        metadata = extract_metadata_using_exiftool(file_path)
 
     # We first start by identifying a non-null Exif datetime field that has UTC offset information.
     for field in DATETIME_FIELDS:
@@ -100,6 +114,7 @@ def determine_timezone(file_path: Union[Path, str]) -> timezone:
 
     # We then calculate the difference between the two datetimes.
     diff = naive_datetime - utc_datetime.replace(tzinfo=None)
+    return timezone(diff)
     # To avoid awkward offsets, we need to round the time difference so that
     # it is a multiple of 3600 seconds (1 hour).
     diff = timedelta(hours=round(diff.total_seconds() / 3600))
@@ -120,30 +135,6 @@ def get_capture_datetime(file_path: Union[Path, str]) -> datetime:
 
     # The presence of one key or another will depend on the nature of the file
     # (photo, video, encoder, etc.) so we greedily find the first one that exists.
-    datetime_str = None
-    for field in metadata.keys():
-        # for field in DATETIME_FIELDS:
-        # if field.name in metadata:
-        if "time" in field.lower():
-            print(field, metadata[field])
-
-    import ipdb
-
-    ipdb.set_trace()
-
-    field1 = ExifDateTimeField("EXIF:DateTimeOriginal")
-    field2 = ExifDateTimeField("Composite:GPSDateTime", has_timezone_info=True)
-    val1 = metadata[field1.name]
-    val2 = metadata[field2.name]
-
-    val1 = field1.parse(val1)
-    val2 = field2.parse(val2)
-
-    val2 = val2.astimezone(timezone.utc).replace(tzinfo=None)
-    print(val1, val2)
-    diff = val1 - val2
-    print(field1.unparse(val1.astimezone(timezone(diff))))
-    print(field2.unparse(val2.astimezone(timezone(diff))))
     exif_field = None  # The Exif field that will be used to get the datetime.
     for field in DATETIME_FIELDS:
         if field.name in metadata:
@@ -160,18 +151,48 @@ def capture_datetimes_are_consistent(file_path: Union[Path, str]) -> bool:
     """There could be many EXIF fields related to capture datetime. This function checks that they are all consistent."""
     file_path = _format_file_path(file_path)
     metadata = extract_metadata_using_exiftool(file_path)
+    media_timezone = determine_timezone(
+        metadata=metadata
+    )  # Getting timezone info is important
+    # because we need to check consistency of datetimes under the same timezone.
 
+    # Here we use a dict to keep track of the mapping between datetime field name
+    # and its actual value. It is not needed per se but makes the code
+    # more easily debuggable (at the expense of readability).
     datetimes = {}
     for field in DATETIME_FIELDS:
         if field.name in metadata:
-            datetimes.update({field.name: field.parse(metadata[field.name])})
+            datetimes.update({field: field.parse(metadata[field.name])})
 
+    # We pick an arbitrary datetime (the first) as a reference.
+    # We make sure we set it to a timezone-aware datetime.
+    # Finally, since some datetimes have microsecond precisions and others don't,
+    # we round them to the nearest second.
     datetime_keys = list(datetimes.keys())
-    ref_datetime = datetimes[datetime_keys[0]]
-    # This way of writing is verbose, but allows for easier debugging.
+    ref_datetime_key = datetime_keys[0]
+    ref_datetime = datetimes[ref_datetime_key]
+    if ref_datetime.tzinfo is None:
+        ref_datetime = ref_datetime.replace(tzinfo=media_timezone)
+    else:
+        ref_datetime = ref_datetime.astimezone(media_timezone)
+    ref_datetime = _nullify_microseconds(ref_datetime)
+
+    # We check that all other datetimes are equal to the reference.
     for datetime_key in datetime_keys[1:]:
-        if datetimes[datetime_key] != ref_datetime:
+        if datetime_key.has_time_info ^ ref_datetime_key.has_time_info:
+            # If one datetime has time info and the other doesn't, we cannot compare them.
+            continue
+
+        other_datetime = datetimes[datetime_key]
+        if other_datetime.tzinfo is None:
+            other_datetime = other_datetime.replace(tzinfo=media_timezone)
+        else:
+            other_datetime = other_datetime.astimezone(media_timezone)
+        other_datetime = _nullify_microseconds(other_datetime)
+
+        if other_datetime != ref_datetime:
             return False  # At least one datetime is different
+
     return True
 
 
@@ -195,3 +216,7 @@ def _format_file_path(file_path: Union[Path, str]) -> Path:
         # ExifTool will raise an error if the file doesn't exist, but this is a more specific error message.
         raise FileNotFoundError(f"File not found: {file_path}")
     return file_path
+
+
+def _nullify_microseconds(dt: datetime) -> datetime:
+    return dt.replace(microsecond=0)

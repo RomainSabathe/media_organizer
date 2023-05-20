@@ -12,7 +12,7 @@ def test_get_capture_datetime_photo(test_img):
     # TODO: add other `test_img` coming from different cameras (1 phone, 1 GoPro, 1 Fuji)
     known_date = datetime(2023, 5, 17, 9, 30, 3)
     assert get_capture_datetime(test_img) == known_date
-    # assert capture_datetimes_are_consistent(test_img)
+    assert capture_datetimes_are_consistent(test_img)
 
 
 def test_get_capture_datetime_video(test_vid):
@@ -44,4 +44,6 @@ def test_set_capture_datetime_multiple_at_a_time(target_media_files):
 
 def test_determine_timezone(test_img):
     # TODO: add the same test for a video.
-    assert determine_timezone(test_img) == timezone(timedelta(hours=2))
+    assert determine_timezone(test_img) == timezone(
+        timedelta(seconds=7201, microseconds=975657)
+    )

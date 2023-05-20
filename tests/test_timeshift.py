@@ -64,8 +64,11 @@ def test_shift_capture_datetime_video(test_vid):
     assert capture_datetimes_are_consistent(test_vid)
 
 
-def test_determine_timezone(test_img):
-    # TODO: add the same test for a video.
+def test_determine_timezone_img(test_img):
     assert determine_timezone(test_img) == timezone(
         timedelta(seconds=7201, microseconds=975657)
     )
+
+
+def test_determine_timezone_video(test_vid):
+    assert determine_timezone(test_vid) is None

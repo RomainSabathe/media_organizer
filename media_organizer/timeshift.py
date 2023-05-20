@@ -197,8 +197,10 @@ def set_capture_datetime(
         file_paths = [file_paths]
     file_paths = [_format_file_path(f) for f in file_paths]
 
-    new_datetime_str = new_datetime.strftime("%Y:%m:%d %H:%M:%S")
-    exiftool_cmd = [f"-{key}={new_datetime_str}" for key in DATETIME_FIELDS]
+    exiftool_cmd = []
+    for field in DATETIME_FIELDS:
+        new_datetime_str = field.unparse(new_datetime)
+        exiftool_cmd.append(f"-{field.name}={new_datetime_str}")
     exiftool_cmd.extend([str(f) for f in file_paths])
     with exiftool.ExifTool() as et:
         et.execute(*exiftool_cmd)
@@ -214,3 +216,13 @@ def _format_file_path(file_path: Union[Path, str]) -> Path:
 
 def _nullify_microseconds(dt: datetime) -> datetime:
     return dt.replace(microsecond=0)
+
+
+def _print_all_exif_datetimes(file_path: Union[Path, str]) -> None:
+    """Prints all EXIF datetimes found in a file.
+    This is useful for debugging purposes."""
+    file_path = _format_file_path(file_path)
+    metadata = extract_metadata_using_exiftool(file_path)
+    for field in DATETIME_FIELDS:
+        if field.name in metadata:
+            print(f"{field.name}: {metadata[field.name]}")

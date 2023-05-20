@@ -5,6 +5,7 @@ from media_organizer.timeshift import (
     set_capture_datetime,
     capture_datetimes_are_consistent,
     determine_timezone,
+    _print_all_exif_datetimes,
 )
 
 

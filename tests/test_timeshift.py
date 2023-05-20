@@ -15,10 +15,19 @@ def test_get_capture_datetime_video(test_vid):
     assert get_capture_datetime(test_vid) == known_date
 
 
-def test_set_capture_datetime(target_media_file):
+def test_set_capture_datetime_one_at_a_time(target_media_file):
     old_date = get_capture_datetime(target_media_file)
     new_date = datetime(2023, 5, 20, 15, 20, 0)
     assert old_date != new_date
 
     set_capture_datetime(target_media_file, new_date)
     assert get_capture_datetime(target_media_file) == new_date
+
+
+def test_set_capture_datetime_multiple_at_a_time(target_media_files):
+    old_dates = [get_capture_datetime(f) for f in target_media_files]
+    new_date = datetime(2023, 5, 20, 15, 20, 0)
+    assert all([old_date != new_date for old_date in old_dates])
+
+    set_capture_datetime(target_media_files, new_date)
+    assert all([get_capture_datetime(f) == new_date for f in target_media_files])

@@ -1,5 +1,5 @@
 """Functions for adjusting the capture datetime of media files (photos and videos) based on a source of truth."""
-from typing import Union
+from typing import Union, List
 from pathlib import Path
 from datetime import datetime
 
@@ -56,16 +56,18 @@ def get_capture_datetime(file_path: Union[Path, str]) -> datetime:
     return None  # Returns None if no capture date was found
 
 
-def set_capture_datetime(file_path: Union[Path, str], new_datetime: datetime) -> None:
-    file_path = _format_file_path(file_path)
+def set_capture_datetime(
+    file_paths: Union[Path, str, List[Union[Path, str]]], new_datetime: datetime
+) -> None:
+    if not isinstance(file_paths, list):
+        file_paths = [file_paths]
+    file_paths = [_format_file_path(f) for f in file_paths]
 
     new_datetime_str = new_datetime.strftime("%Y:%m:%d %H:%M:%S")
+    exiftool_cmd = [f"-{key}={new_datetime_str}" for key in DATETIME_KEYS]
+    exiftool_cmd.extend([str(f) for f in file_paths])
     with exiftool.ExifTool() as et:
-        et.execute(
-            f"-EXIF:ModifyDate={new_datetime_str}",
-            f"-QuickTime:CreateDate={new_datetime_str}",
-            str(file_path),
-        )
+        et.execute(*exiftool_cmd)
 
 
 def _format_file_path(file_path: Union[Path, str]) -> Path:

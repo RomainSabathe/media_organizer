@@ -9,12 +9,20 @@ THIS_DIR = Path(__file__).resolve().parent
 
 @pytest.fixture
 def test_img():
+    # return THIS_DIR / "data" / "tmp" / "test_img_phone.jpg"
     return THIS_DIR / "data" / "test_img_phone.jpg"
 
 
 @pytest.fixture
 def test_vid():
     return THIS_DIR / "data" / "test_vid_gopro.mp4"
+
+
+@pytest.fixture
+def tmp_path(tmp_path):
+    # Allows for easier debugging (just replace tmp_path by whatever you like).
+    return Path("C:/Users/RSaba/git/media_organizer/tests/data/tmp")
+    return tmp_path
 
 
 @pytest.fixture

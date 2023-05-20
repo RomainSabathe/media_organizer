@@ -90,7 +90,7 @@ def extract_metadata_using_exiftool(file_path: Union[Path, str]) -> dict:
 def determine_timezone(
     file_path: Optional[Union[Path, str]] = None,
     metadata: Optional[Dict[str, str]] = None,
-) -> timezone:
+) -> Union[timezone, None]:
     """Determine the timezone of a media file based on its metadata."""
     if file_path is None and metadata is None:
         raise ValueError("Either file_path or metadata must be provided.")
@@ -99,12 +99,18 @@ def determine_timezone(
         metadata = extract_metadata_using_exiftool(file_path)
 
     # We first start by identifying a non-null Exif datetime field that has UTC offset information.
+    utc_datetime = None
     for field in DATETIME_FIELDS:
         if (
             not field.has_timezone_info and not field.is_utc
         ) or field.name not in metadata:
             continue
         utc_datetime = field.parse(metadata[field.name])
+    if utc_datetime is None:
+        # For some media (typically: GoPro videos), we simply can't access the timezone
+        # info from the datetime fields. Using GPS data is the only other option.
+        # TODO: Implement this.
+        return None
 
     # We do the same, this time looking for a field that has no timezone info.
     for field in DATETIME_FIELDS:
@@ -115,18 +121,6 @@ def determine_timezone(
     # We then calculate the difference between the two datetimes.
     diff = naive_datetime - utc_datetime.replace(tzinfo=None)
     return timezone(diff)
-    # To avoid awkward offsets, we need to round the time difference so that
-    # it is a multiple of 3600 seconds (1 hour).
-    diff = timedelta(hours=round(diff.total_seconds() / 3600))
-    return timezone(diff)
-
-    # la = timezone(diff)
-    # print(naive_datetime)
-    # print(naive_datetime.replace(tzinfo=la))
-    # print(naive_datetime.replace(tzinfo=la).astimezone(timezone.utc))
-    # import ipdb
-
-    # ipdb.set_trace()
 
 
 def get_capture_datetime(file_path: Union[Path, str]) -> datetime:

@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "media-organizer"
+version = "0.1.0"
+description = ""
+authors = ["RomainSabathe <RSabathe@gmail.com>"]
+readme = "README.md"
+packages = [{include = "media_organizer"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pytest = "^7.3.1"
+pyexiftool = "^0.5.5"
+ipdb = "^0.13.13"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

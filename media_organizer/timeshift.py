@@ -95,7 +95,6 @@ def determine_timezone(
     if file_path is None and metadata is None:
         raise ValueError("Either file_path or metadata must be provided.")
     if metadata is None:
-        file_path = _format_file_path(file_path)
         metadata = extract_metadata_using_exiftool(file_path)
 
     # We first start by identifying a non-null Exif datetime field that has UTC offset information.
@@ -124,7 +123,6 @@ def determine_timezone(
 
 
 def get_capture_datetime(file_path: Union[Path, str]) -> datetime:
-    file_path = _format_file_path(file_path)
     metadata = extract_metadata_using_exiftool(file_path)
 
     # The presence of one key or another will depend on the nature of the file
@@ -143,7 +141,6 @@ def get_capture_datetime(file_path: Union[Path, str]) -> datetime:
 
 def capture_datetimes_are_consistent(file_path: Union[Path, str]) -> bool:
     """There could be many EXIF fields related to capture datetime. This function checks that they are all consistent."""
-    file_path = _format_file_path(file_path)
     metadata = extract_metadata_using_exiftool(file_path)
     media_timezone = determine_timezone(
         metadata=metadata
@@ -260,7 +257,6 @@ def _nullify_microseconds(dt: datetime) -> datetime:
 def _print_all_exif_datetimes(file_path: Union[Path, str]) -> None:
     """Prints all EXIF datetimes found in a file.
     This is useful for debugging purposes."""
-    file_path = _format_file_path(file_path)
     metadata = extract_metadata_using_exiftool(file_path)
     for field in metadata.keys():
         if "time" in field.lower() or "date" in field.lower():

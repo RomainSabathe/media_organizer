@@ -24,14 +24,24 @@ def test_get_capture_datetime_video(test_vid):
     assert capture_datetimes_are_consistent(test_vid)
 
 
-def test_set_capture_datetime_one_at_a_time(target_media_file):
-    old_date = get_capture_datetime(target_media_file)
+def test_set_capture_datetime_one_at_a_time(test_media_file):
+    old_date = get_capture_datetime(test_media_file)
     new_date = datetime(2023, 5, 20, 15, 20, 0)
     assert old_date != new_date
 
-    set_capture_datetime(target_media_file, new_date)
-    assert get_capture_datetime(target_media_file) == new_date
-    assert capture_datetimes_are_consistent(target_media_file)
+    set_capture_datetime(test_media_file, new_date)
+    assert get_capture_datetime(test_media_file) == new_date
+    assert capture_datetimes_are_consistent(test_media_file)
+
+
+def test_set_capture_datetime_multiple_at_a_time(test_media_files):
+    old_dates = [get_capture_datetime(f) for f in test_media_files]
+    new_date = datetime(2023, 5, 20, 15, 20, 0)
+    assert all([old_date != new_date for old_date in old_dates])
+
+    set_capture_datetime(test_media_files, new_date)
+    assert all([get_capture_datetime(f) == new_date for f in test_media_files])
+    assert all([capture_datetimes_are_consistent(f) for f in test_media_files])
 
 
 def test_shift_capture_datetime_photo(test_img):
@@ -52,16 +62,6 @@ def test_shift_capture_datetime_video(test_vid):
     shift_capture_datetime(test_vid, new_date)
     assert get_capture_datetime(test_vid) == expected_date
     assert capture_datetimes_are_consistent(test_vid)
-
-
-def test_set_capture_datetime_multiple_at_a_time(target_media_files):
-    old_dates = [get_capture_datetime(f) for f in target_media_files]
-    new_date = datetime(2023, 5, 20, 15, 20, 0)
-    assert all([old_date != new_date for old_date in old_dates])
-
-    set_capture_datetime(target_media_files, new_date)
-    assert all([get_capture_datetime(f) == new_date for f in target_media_files])
-    assert all([capture_datetimes_are_consistent(f) for f in target_media_files])
 
 
 def test_determine_timezone(test_img):

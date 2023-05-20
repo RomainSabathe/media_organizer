@@ -8,14 +8,25 @@ THIS_DIR = Path(__file__).resolve().parent
 
 
 @pytest.fixture
-def test_img():
-    # return THIS_DIR / "data" / "tmp" / "test_img_phone.jpg"
-    return THIS_DIR / "data" / "test_img_phone.jpg"
+def test_img(tmp_path):
+    file_path = THIS_DIR / "data" / "test_img_phone.jpg"
+
+    # Creating a copy of the file so that we don't modify the original file.
+    temp_file_path = tmp_path / file_path.name
+    shutil.copy2(file_path, temp_file_path)
+
+    yield temp_file_path
 
 
 @pytest.fixture
 def test_vid():
-    return THIS_DIR / "data" / "test_vid_gopro.mp4"
+    file_path = THIS_DIR / "data" / "test_vid_gopro.mp4"
+
+    # Creating a copy of the file so that we don't modify the original file.
+    temp_file_path = tmp_path / file_path.name
+    shutil.copy2(file_path, temp_file_path)
+
+    yield temp_file_path
 
 
 @pytest.fixture

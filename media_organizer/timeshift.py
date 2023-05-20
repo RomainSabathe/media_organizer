@@ -54,11 +54,11 @@ PHOTO_DATETIME_FIELDS = [
     ExifDateTimeField("EXIF:DateTimeOriginal"),
     ExifDateTimeField("EXIF:CreateDate"),
     ExifDateTimeField("EXIF:GPSDateStamp", has_time_info=False),
-    ExifDateTimeField("Composite:SubSecCreateDate", has_millisecond_info=True),
-    ExifDateTimeField("Composite:SubSecDateTimeOriginal", has_millisecond_info=True),
-    ExifDateTimeField("Composite:SubSecModifyDate", has_millisecond_info=True),
-    ExifDateTimeField("Composite:GPSDateTime", has_timezone_info=True, is_utc=True),
-    ExifDateTimeField("Composite:GPSDateTimeCreated", has_timezone_info=True),
+    # ExifDateTimeField("Composite:SubSecCreateDate", has_millisecond_info=True),
+    # ExifDateTimeField("Composite:SubSecDateTimeOriginal", has_millisecond_info=True),
+    # ExifDateTimeField("Composite:SubSecModifyDate", has_millisecond_info=True),
+    # ExifDateTimeField("Composite:GPSDateTime", has_timezone_info=True, is_utc=True),
+    # ExifDateTimeField("Composite:GPSDateTimeCreated", has_timezone_info=True),
     ExifDateTimeField("XMP:DateTimeDigitized", has_timezone_info=True),
     ExifDateTimeField("XMP:DateTimeOriginal", has_timezone_info=True),
     ExifDateTimeField("XMP:GPSDateTime", has_timezone_info=True, is_utc=True),
@@ -206,6 +206,45 @@ def set_capture_datetime(
         et.execute(*exiftool_cmd)
 
 
+def shift_capture_datetime(
+    file_paths: Union[Path, str, List[Union[Path, str]]],
+    datetime_shift: timedelta,
+    metadata: Optional[Dict[str, str]] = None,
+) -> None:
+    if not isinstance(file_paths, list):
+        file_paths = [file_paths]
+    file_paths = [_format_file_path(f) for f in file_paths]
+
+    for file_path in file_paths:
+        if metadata is None:
+            metadata = extract_metadata_using_exiftool(file_path)
+
+        exiftool_cmd = []
+        for field in DATETIME_FIELDS:
+            if field.name not in metadata:
+                continue
+            datetime_shift_copy = datetime_shift
+            # We must apply special care to the following case, when both of these
+            # conditions are valid:
+            # 1. The field has no time info (e.g. GPSDateStamp)
+            # 2. The timeshift is less than a day.
+            # Otherwise, we may end up with surprising results.
+            # For instance: 2020-01-01 00:00:00 + (-20 mins) = 2019-12-31 23:40:00
+            # We end up shifted by a whole day!
+            # The easiest way is to round the shift to the nearest day.
+            if not field.has_time_info:
+                datetime_shift_copy = timedelta(
+                    days=round(datetime_shift.total_seconds() / (24 * 60 * 60))
+                )
+
+            new_datetime = field.parse(metadata[field.name]) + datetime_shift_copy
+            new_datetime_str = field.unparse(new_datetime)
+            exiftool_cmd.append(f"-{field.name}={new_datetime_str}")
+        exiftool_cmd.extend([str(file_path)])
+        with exiftool.ExifTool() as et:
+            et.execute(*exiftool_cmd)
+
+
 def _format_file_path(file_path: Union[Path, str]) -> Path:
     file_path = Path(file_path)
     if not file_path.exists():
@@ -223,6 +262,6 @@ def _print_all_exif_datetimes(file_path: Union[Path, str]) -> None:
     This is useful for debugging purposes."""
     file_path = _format_file_path(file_path)
     metadata = extract_metadata_using_exiftool(file_path)
-    for field in DATETIME_FIELDS:
-        if field.name in metadata:
-            print(f"{field.name}: {metadata[field.name]}")
+    for field in metadata.keys():
+        if "time" in field.lower() or "date" in field.lower():
+            print(f"{field}: {metadata[field]}")

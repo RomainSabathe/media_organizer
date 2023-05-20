@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from media_organizer.timeshift import (
     get_capture_datetime,
     set_capture_datetime,
+    shift_capture_datetime,
     capture_datetimes_are_consistent,
     determine_timezone,
     _print_all_exif_datetimes,
@@ -11,15 +12,15 @@ from media_organizer.timeshift import (
 
 def test_get_capture_datetime_photo(test_img):
     # TODO: add other `test_img` coming from different cameras (1 phone, 1 GoPro, 1 Fuji)
-    known_date = datetime(2023, 5, 17, 9, 30, 3)
-    assert get_capture_datetime(test_img) == known_date
+    expected_date = datetime(2023, 5, 17, 9, 30, 3)
+    assert get_capture_datetime(test_img) == expected_date
     assert capture_datetimes_are_consistent(test_img)
 
 
 def test_get_capture_datetime_video(test_vid):
     # TODO: add other `test_video` coming from different cameras (1 phone, 1 GoPro, 1 Fuji)
-    known_date = datetime(2022, 4, 30, 9, 33, 7)
-    assert get_capture_datetime(test_vid) == known_date
+    expected_date = datetime(2022, 4, 30, 9, 33, 7)
+    assert get_capture_datetime(test_vid) == expected_date
     assert capture_datetimes_are_consistent(test_vid)
 
 
@@ -31,6 +32,26 @@ def test_set_capture_datetime_one_at_a_time(target_media_file):
     set_capture_datetime(target_media_file, new_date)
     assert get_capture_datetime(target_media_file) == new_date
     assert capture_datetimes_are_consistent(target_media_file)
+
+
+def test_shift_capture_datetime_photo(test_img):
+    # From a previous test, we know that the original date is 2023-05-17 09:30:03.
+    new_date = timedelta(hours=-1, minutes=47, seconds=0)
+    expected_date = datetime(2023, 5, 17, 9, 17, 3)
+
+    shift_capture_datetime(test_img, new_date)
+    assert get_capture_datetime(test_img) == expected_date
+    assert capture_datetimes_are_consistent(test_img)
+
+
+def test_shift_capture_datetime_video(test_vid):
+    # From a previous test, we know that original date is 2022-04-30 09:33:07.
+    new_date = timedelta(hours=-1, minutes=47, seconds=0)
+    expected_date = datetime(2022, 4, 30, 9, 20, 7)
+
+    shift_capture_datetime(test_vid, new_date)
+    assert get_capture_datetime(test_vid) == expected_date
+    assert capture_datetimes_are_consistent(test_vid)
 
 
 def test_set_capture_datetime_multiple_at_a_time(target_media_files):

@@ -19,7 +19,7 @@ def test_img(tmp_path):
 
 
 @pytest.fixture
-def test_vid():
+def test_vid(tmp_path):
     file_path = THIS_DIR / "data" / "test_vid_gopro.mp4"
 
     # Creating a copy of the file so that we don't modify the original file.
@@ -32,7 +32,7 @@ def test_vid():
 @pytest.fixture
 def tmp_path(tmp_path):
     # Allows for easier debugging (just replace tmp_path by whatever you like).
-    return Path("C:/Users/RSaba/git/media_organizer/tests/data/tmp")
+    # return Path("C:/Users/RSaba/git/media_organizer/tests/data/tmp")
     return tmp_path
 
 

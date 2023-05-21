@@ -15,6 +15,7 @@ class ExifDateTimeField:
     has_timezone_info: bool = False
     has_millisecond_info: bool = False
     is_utc: bool = False
+    is_gps_related: bool = False
 
     @property
     def format(self) -> str:
@@ -81,8 +82,8 @@ PHOTO_DATETIME_FIELDS = [
     ExifDateTimeField("EXIF:ModifyDate"),
     ExifDateTimeField("EXIF:DateTimeOriginal"),
     ExifDateTimeField("EXIF:CreateDate"),
-    ExifDateTimeField("EXIF:GPSTimeStamp", has_date_info=False),
-    ExifDateTimeField("EXIF:GPSDateStamp", has_time_info=False),
+    ExifDateTimeField("EXIF:GPSTimeStamp", has_date_info=False, is_gps_related=True),
+    ExifDateTimeField("EXIF:GPSDateStamp", has_time_info=False, is_gps_related=True),
     ExifDateTimeField("Composite:SubSecCreateDate", has_millisecond_info=True),
     ExifDateTimeField("Composite:SubSecDateTimeOriginal", has_millisecond_info=True),
     ExifDateTimeField("Composite:SubSecModifyDate", has_millisecond_info=True),
@@ -95,7 +96,10 @@ PHOTO_DATETIME_FIELDS = [
     ExifDateTimeField("XMP:CreateDate"),
     ExifDateTimeField("XMP:DateTimeDigitized", has_timezone_info=True),
     ExifDateTimeField("XMP:DateTimeOriginal", has_timezone_info=True),
-    ExifDateTimeField("XMP:GPSDateTime", has_timezone_info=True, is_utc=True),
+    ExifDateTimeField("XMP:ModifyDate", has_timezone_info=True),
+    ExifDateTimeField(
+        "XMP:GPSDateTime", has_timezone_info=True, is_utc=True, is_gps_related=True
+    ),
     ExifDateTimeField("IPTC:DateCreated", has_time_info=False),
     ExifDateTimeField("IPTC:TimeCreated", has_date_info=False, has_timezone_info=True),
 ]
@@ -108,6 +112,32 @@ VIDEO_DATETIME_FIELDS = [
     ExifDateTimeField("QuickTime:MediaModifyDate"),
 ]
 DATETIME_FIELDS = PHOTO_DATETIME_FIELDS + VIDEO_DATETIME_FIELDS
+
+GPS_FIELDS = [
+    "EXIF:GPSVersionID",
+    "EXIF:GPSLatitudeRef",
+    "EXIF:GPSLatitude",
+    "EXIF:GPSLongitudeRef",
+    "EXIF:GPSLongitude",
+    "EXIF:GPSAltitudeRef",
+    "EXIF:GPSAltitude",
+    "EXIF:GPSTimeStamp",
+    "EXIF:GPSProcessingMethod",
+    "EXIF:GPSDateStamp",
+    "EXIF:GPSDifferential",
+    "Composite:GPSLatitude",
+    "Composite:GPSLongitude",
+    "Composite:GPSPosition",
+    "Composite:GPSAltitude",
+    "Composite:GPSAltitudeRef",
+    "Composite:GPSDateTime",
+    "Composite:GPSLatitudeRef",
+    "Composite:GPSLongitudeRef",
+    "Composite:GPSMapDatum",
+    "Composite:GPSProcessingMethod",
+    "Composite:GPSPosition",
+    "Composite:GPSSatellites",
+]
 
 
 def extract_metadata_using_exiftool(file_path: Union[Path, str]) -> dict:
@@ -123,19 +153,55 @@ def extract_metadata_using_exiftool(file_path: Union[Path, str]) -> dict:
     return metadata
 
 
-def determine_timezone(
+def get_timezone(
     file_path: Optional[Union[Path, str]] = None,
     metadata: Optional[Dict[str, str]] = None,
 ) -> Union[timezone, None]:
-    """Determine the timezone of a media file based on its metadata."""
+    """Determine the timezone of a media file based on its metadata.
+    -!- Warning: I know for sure this function does *not* have the same behavior
+    as Google Photos. Meaning that Google Photos could infer a different datetime
+    compared to this function.
+
+    Google Photos has the following behaviour:
+    - When GPS info is available, it uses it to determine the timezone.
+      In particular, the EXIF:Offset is ignored.
+    - Otherwise, it uses fields such as XPM:DateTimeOriginal. Exactly which
+      fields are used is still to be determined).
+      It works when saving with GeoSetter. GeoSetter sets the
+      following fields with timezone info:
+      - IPTC:TimeCreated
+      - XMP:DateTimeDigitized
+      - XMP:DateTimeOriginal
+      - XMP:DateCreated
+      - XMP:ModifyDate
+      - Composite:DateTimeCreated
+
+      Moreover, I verified that Google Photos does *not* use the EXIF:OffsetTime
+      field. Once again, this implies that this function has a different behavior
+      compared to Google Photos.
+      # TODO: try to make this function behave like Google Photos.
+    """
     if file_path is None and metadata is None:
         raise ValueError("Either file_path or metadata must be provided.")
     if metadata is None:
         metadata = extract_metadata_using_exiftool(file_path)
 
-    # Sometimes, we directly have access to fields that have:
+    ### There are multiple ways of obtaining the timezone of a media file.
+    # In turn, we will try three methods.
+
+    # Method 1: directly use the timezone info from the metadata.
+    if "EXIF:OffsetTime" in metadata:
+        offset = metadata["EXIF:OffsetTime"]  # e.g. "+01:00"
+        sign = offset[0]
+        hours, mins = offset[1:].split(":")
+        offset = int(hours) * 60 + int(mins)
+
+        return timezone(timedelta(minutes=int(f"{sign}{offset}")))
+
+    # Method 2: we have access to a field that comes with timezone info attached.
+    # That is, a field that has:
     # - timezone info
-    # - are *not* expressed in UTC
+    # - the timezone is *not* expressed in UTC
     # In which case, we can directly use the non-UTC timezone as source of truth.
     for field in DATETIME_FIELDS:
         if (
@@ -146,7 +212,7 @@ def determine_timezone(
         ):
             return field.parse(metadata[field.name]).tzinfo
 
-    # Otherwise, we need to manually compute the timezone by looking at the difference between
+    # Method 3: we need to manually compute the timezone by looking at the difference between
     # naive-datetime and UTC-datetime.
     # We first start by identifying a non-null Exif datetime field that has UTC offset information.
     utc_datetime = None
@@ -204,7 +270,7 @@ def get_capture_datetime(file_path: Union[Path, str]) -> datetime:
 def capture_datetimes_are_consistent(file_path: Union[Path, str]) -> bool:
     """There could be many EXIF fields related to capture datetime. This function checks that they are all consistent."""
     metadata = extract_metadata_using_exiftool(file_path)
-    media_timezone = determine_timezone(
+    media_timezone = get_timezone(
         metadata=metadata
     )  # Getting timezone info is important
     # because we need to check consistency of datetimes under the same timezone.
@@ -352,11 +418,66 @@ def _print_all_exif_datetimes(file_path: Union[Path, str]) -> None:
     This is useful for debugging purposes."""
     metadata = extract_metadata_using_exiftool(file_path)
     for field in metadata.keys():
-        if "time" in field.lower() or "date" in field.lower():
+        # if "time" in field.lower() or "date" in field.lower():
+        if "gps" in field.lower():
             print(f"{field}: {metadata[field]}")
 
 
 def set_timezone(
     file_paths: Union[Path, str, List[Union[Path, str]]], timezone: timedelta
 ) -> None:
-    return
+    if not isinstance(file_paths, list):
+        file_paths = [file_paths]
+    file_paths = [_format_file_path(f) for f in file_paths]
+
+    # We need to convert the timezone into "+HH:MM" or "-HH:MM" format.
+    # This format will be used by ExifTool.
+    hours, remainder = divmod(abs(timezone.total_seconds()), 3600)
+    minutes, _ = divmod(remainder, 60)
+    sign = "-" if timezone.total_seconds() < 0 else "+"
+    timezone_str = f"{sign}{int(hours):02d}:{int(minutes):02d}"
+
+    exiftool_cmd = []
+    for field in DATETIME_FIELDS:
+        if not field.has_timezone_info:
+            # We simply take the field and append the timezone info.
+            # The line is hard to read because of the escaping, but it's
+            # basically:
+            # e.g. "-EXIF:ModifyDate<${EXIF:ModifyDate}+08:00"
+            arg = f"-{field.name}<$" + "{" + field.name + "}" + timezone_str
+        else:
+            # When the field already contains the timezone info, we can't simply
+            # append another timezone info (we'd end up with "+02:00+08:00").
+            # Instead, we perform a string substitution using ExifTool's built-in
+            # substitution feature.
+            # Again, the line is hard to read because of the escaping, but it's
+            # basically:
+            # e.g. "-XMP:DateTimeDigitized<${XP:DateTimeDigitized;s/\+00:00/+08:00/}"
+            # TODO: what happens if the timezone info is not "+00:00"?
+            arg = (
+                f"-{field.name}<$"
+                + "{"
+                + field.name
+                + r";s/\+00:00/"
+                + timezone_str
+                + "/}"
+            )
+        exiftool_cmd.append(arg)
+
+    exiftool_cmd.extend([str(f) for f in file_paths])
+    with exiftool.ExifTool() as et:
+        et.execute(*exiftool_cmd)
+
+
+def remove_gps_info(file_paths: Union[Path, str, List[Union[Path, str]]]):
+    if not isinstance(file_paths, list):
+        file_paths = [file_paths]
+    file_paths = [_format_file_path(f) for f in file_paths]
+
+    exiftool_cmd = []
+    for field in GPS_FIELDS:
+        exiftool_cmd.append(f"-{field}=")
+
+    exiftool_cmd.extend([str(f) for f in file_paths])
+    with exiftool.ExifTool() as et:
+        et.execute(*exiftool_cmd)

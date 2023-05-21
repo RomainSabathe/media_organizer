@@ -206,13 +206,36 @@ def set_capture_datetime(
 def shift_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     datetime_shift: timedelta,
-    metadata: Optional[Dict[str, str]] = None,
+    metadatas: Optional[Union[Dict[str, str], List[Dict[str, str]]]] = None,
 ) -> None:
+    """
+    Shifts the capture datetime of the given file(s) by the given timedelta.
+    If no metadata is provided, it will be extracted using ExifTool.
+
+    Args:
+        file_paths: The file(s) whose capture datetime will be shifted.
+        datetime_shift: The timedelta by which the capture datetime will be shifted.
+        metadatas: The metadata of the file(s) whose capture datetime will be shifted.
+                   `metadata` can be either:
+                   - A dict of metadata (as returned by `extract_metadata_using_exiftool`).
+                     -!- This *unique* dict will be used for all files.
+                   - A list of dicts of metadata (as returned by `extract_metadata_using_exiftool`).
+                     Each dict will be used for the corresponding file_path.
+                     (i.e. the first dict will be used for the first file_path, etc.)
+                    The preferred option is to use a list of dicts.
+    """
     if not isinstance(file_paths, list):
         file_paths = [file_paths]
     file_paths = [_format_file_path(f) for f in file_paths]
 
-    for file_path in file_paths:
+    if metadatas is None:
+        metadatas = [None] * len(file_paths)
+    elif isinstance(metadatas, dict):
+        metatadas = [metadatas] * len(file_paths)
+    else:
+        assert len(metadatas) == len(file_paths)
+
+    for file_path, metadata in zip(file_paths, metadatas):
         if metadata is None:
             metadata = extract_metadata_using_exiftool(file_path)
 

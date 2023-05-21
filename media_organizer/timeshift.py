@@ -244,8 +244,8 @@ def shift_capture_datetime(
             if field.name not in metadata:
                 continue
             datetime_shift_copy = datetime_shift
-            # We must apply special care to the following case, when both of these
-            # conditions are valid:
+            # We must apply special care to the following case (when both of the
+            # following conditions are true):
             # 1. The field has no time info (e.g. GPSDateStamp)
             # 2. The timeshift is less than a day.
             # Otherwise, we may end up with surprising results.
@@ -257,9 +257,21 @@ def shift_capture_datetime(
                     days=round(datetime_shift.total_seconds() / (24 * 60 * 60))
                 )
 
-            new_datetime = field.parse(metadata[field.name]) + datetime_shift_copy
-            new_datetime_str = field.unparse(new_datetime)
-            exiftool_cmd.append(f"-{field.name}={new_datetime_str}")
+            # new_datetime = field.parse(metadata[field.name]) + datetime_shift_copy
+            # new_datetime_str = field.unparse(new_datetime)
+            shift_sign = "+=" if datetime_shift_copy.total_seconds() >= 0 else "-="
+            datetime_shift_copy = abs(datetime_shift_copy)
+
+            shift_days = datetime_shift_copy.days
+            shift_seconds = datetime_shift_copy.seconds
+            shift_hours, remainder = divmod(shift_seconds, 3600)
+            shift_minutes, shift_seconds = divmod(remainder, 60)
+
+            exiftool_cmd.append(
+                # e.g. "-EXIF:DateTimeOriginal+=1 13:02:55"
+                # e.g. "-EXIF:DateTimeOriginal-=0 01:20:30"
+                f"-{field.name}{shift_sign}{shift_days} {shift_hours:02d}:{shift_minutes:02d}:{shift_seconds:02d}"
+            )
         exiftool_cmd.extend([str(file_path)])
         with exiftool.ExifTool() as et:
             et.execute(*exiftool_cmd)

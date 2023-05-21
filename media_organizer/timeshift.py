@@ -55,6 +55,7 @@ class ExifDateTimeField:
             date = date.astimezone(timezone.utc)
         date_str = date.strftime(self.format)
 
+        # TODO: delete this when we're sure that this is not needed anymore.
         ## ExifTool expects timezones to be expressed like this: +01:00 instead of +0100.
         ## strftime returns the latter format, so we need to convert it to the former.
         # if self.has_timezone_info:
@@ -247,19 +248,23 @@ def capture_datetimes_are_consistent(file_path: Union[Path, str]) -> bool:
         other_datetime = _nullify_microseconds(other_datetime)
 
         if other_datetime != ref_datetime:
-            import ipdb
-
-            ipdb.set_trace()
             return False  # At least one datetime is different
 
     return True
 
 
 def set_capture_datetime(
-    file_paths: Union[Path, str, List[Union[Path, str]]],
-    new_datetime: datetime,
-    timezone: Optional[timedelta] = None,
+    file_paths: Union[Path, str, List[Union[Path, str]]], new_datetime: datetime
 ) -> None:
+    """Sets the capture datetime of the given file(s) to the given datetime.
+    Warning: this function will erase the timezone information of the different files.
+    The new datetime will be interpreted as UTC.
+    To change this, chain this function with `set_timezone`.
+
+    Args:
+        file_paths: The file(s) to modify.
+        new_datetime: The new datetime to set.
+    """
     if not isinstance(file_paths, list):
         file_paths = [file_paths]
     file_paths = [_format_file_path(f) for f in file_paths]
@@ -271,8 +276,6 @@ def set_capture_datetime(
     exiftool_cmd.extend([str(f) for f in file_paths])
     with exiftool.ExifTool() as et:
         et.execute(*exiftool_cmd)
-
-    set_timezone(file_paths, timezone)
 
 
 def shift_capture_datetime(

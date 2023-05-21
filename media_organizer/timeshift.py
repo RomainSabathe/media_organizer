@@ -206,7 +206,6 @@ def set_capture_datetime(
 def shift_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     datetime_shift: timedelta,
-    metadatas: Optional[Union[Dict[str, str], List[Dict[str, str]]]] = None,
 ) -> None:
     """
     Shifts the capture datetime of the given file(s) by the given timedelta.
@@ -215,66 +214,46 @@ def shift_capture_datetime(
     Args:
         file_paths: The file(s) whose capture datetime will be shifted.
         datetime_shift: The timedelta by which the capture datetime will be shifted.
-        metadatas: The metadata of the file(s) whose capture datetime will be shifted.
-                   `metadata` can be either:
-                   - A dict of metadata (as returned by `extract_metadata_using_exiftool`).
-                     -!- This *unique* dict will be used for all files.
-                   - A list of dicts of metadata (as returned by `extract_metadata_using_exiftool`).
-                     Each dict will be used for the corresponding file_path.
-                     (i.e. the first dict will be used for the first file_path, etc.)
-                    The preferred option is to use a list of dicts.
     """
     if not isinstance(file_paths, list):
         file_paths = [file_paths]
     file_paths = [_format_file_path(f) for f in file_paths]
 
-    if metadatas is None:
-        metadatas = [None] * len(file_paths)
-    elif isinstance(metadatas, dict):
-        metatadas = [metadatas] * len(file_paths)
-    else:
-        assert len(metadatas) == len(file_paths)
-
-    for file_path, metadata in zip(file_paths, metadatas):
-        if metadata is None:
-            metadata = extract_metadata_using_exiftool(file_path)
-
-        exiftool_cmd = []
-        for field in DATETIME_FIELDS:
-            if field.name not in metadata:
-                continue
-            datetime_shift_copy = datetime_shift
-            # We must apply special care to the following case (when both of the
-            # following conditions are true):
-            # 1. The field has no time info (e.g. GPSDateStamp)
-            # 2. The timeshift is less than a day.
-            # Otherwise, we may end up with surprising results.
-            # For instance: 2020-01-01 00:00:00 + (-20 mins) = 2019-12-31 23:40:00
-            # We end up shifted by a whole day!
-            # The easiest way is to round the shift to the nearest day.
-            if not field.has_time_info:
-                datetime_shift_copy = timedelta(
-                    days=round(datetime_shift.total_seconds() / (24 * 60 * 60))
-                )
-
-            # new_datetime = field.parse(metadata[field.name]) + datetime_shift_copy
-            # new_datetime_str = field.unparse(new_datetime)
-            shift_sign = "+=" if datetime_shift_copy.total_seconds() >= 0 else "-="
-            datetime_shift_copy = abs(datetime_shift_copy)
-
-            shift_days = datetime_shift_copy.days
-            shift_seconds = datetime_shift_copy.seconds
-            shift_hours, remainder = divmod(shift_seconds, 3600)
-            shift_minutes, shift_seconds = divmod(remainder, 60)
-
-            exiftool_cmd.append(
-                # e.g. "-EXIF:DateTimeOriginal+=1 13:02:55"
-                # e.g. "-EXIF:DateTimeOriginal-=0 01:20:30"
-                f"-{field.name}{shift_sign}{shift_days} {shift_hours:02d}:{shift_minutes:02d}:{shift_seconds:02d}"
+    exiftool_cmd = []
+    for field in DATETIME_FIELDS:
+        datetime_shift_copy = datetime_shift
+        # We must apply special care to the following case (when both of the
+        # following conditions are true):
+        # 1. The field has no time info (e.g. GPSDateStamp)
+        # 2. The timeshift is less than a day.
+        # Otherwise, we may end up with surprising results.
+        # For instance: 2020-01-01 00:00:00 + (-20 mins) = 2019-12-31 23:40:00
+        # We end up shifted by a whole day!
+        # The easiest way is to round the shift to the nearest day.
+        if not field.has_time_info:
+            datetime_shift_copy = timedelta(
+                days=round(datetime_shift.total_seconds() / (24 * 60 * 60))
             )
-        exiftool_cmd.extend([str(file_path)])
-        with exiftool.ExifTool() as et:
-            et.execute(*exiftool_cmd)
+
+        # new_datetime = field.parse(metadata[field.name]) + datetime_shift_copy
+        # new_datetime_str = field.unparse(new_datetime)
+        shift_sign = "+=" if datetime_shift_copy.total_seconds() >= 0 else "-="
+        datetime_shift_copy = abs(datetime_shift_copy)
+
+        shift_days = datetime_shift_copy.days
+        shift_seconds = datetime_shift_copy.seconds
+        shift_hours, remainder = divmod(shift_seconds, 3600)
+        shift_minutes, shift_seconds = divmod(remainder, 60)
+
+        exiftool_cmd.append(
+            # e.g. "-EXIF:DateTimeOriginal+=1 13:02:55"
+            # e.g. "-EXIF:DateTimeOriginal-=0 01:20:30"
+            f"-{field.name}{shift_sign}{shift_days} {shift_hours:02d}:{shift_minutes:02d}:{shift_seconds:02d}"
+        )
+
+    exiftool_cmd.extend([str(f) for f in file_paths])
+    with exiftool.ExifTool() as et:
+        et.execute(*exiftool_cmd)
 
 
 def _format_file_path(file_path: Union[Path, str]) -> Path:

@@ -53,7 +53,19 @@ class ExifDateTimeField:
         if self.has_time_info and self.is_utc:
             # Convert to UTC if needed
             date = date.astimezone(timezone.utc)
-        return date.strftime(self.format)
+        date_str = date.strftime(self.format)
+
+        ## ExifTool expects timezones to be expressed like this: +01:00 instead of +0100.
+        ## strftime returns the latter format, so we need to convert it to the former.
+        # if self.has_timezone_info:
+        #    time_parts, tz_offset_str = (
+        #        date_str.split("+") if "+" in date_str else date_str.split("-")
+        #    )
+        #    sign = "+" if "+" in date_str else "-"
+        #    tz_offset_str = tz_offset_str[:2] + ":" + tz_offset_str[2:]
+        #    date_str = time_parts + sign + tz_offset_str
+
+        return date_str
 
     def __hash__(self):
         return hash(self.name)
@@ -68,6 +80,7 @@ PHOTO_DATETIME_FIELDS = [
     ExifDateTimeField("EXIF:ModifyDate"),
     ExifDateTimeField("EXIF:DateTimeOriginal"),
     ExifDateTimeField("EXIF:CreateDate"),
+    ExifDateTimeField("EXIF:GPSTimeStamp", has_date_info=False),
     ExifDateTimeField("EXIF:GPSDateStamp", has_time_info=False),
     ExifDateTimeField("Composite:SubSecCreateDate", has_millisecond_info=True),
     ExifDateTimeField("Composite:SubSecDateTimeOriginal", has_millisecond_info=True),
@@ -142,6 +155,7 @@ def determine_timezone(
             or not field.is_utc
             or field.name not in metadata
             or not field.has_date_info
+            or field.has_millisecond_info  # Miliseconds are irrelevant here
         ):
             continue
         utc_datetime = field.parse(metadata[field.name])
@@ -158,6 +172,7 @@ def determine_timezone(
             field.has_timezone_info
             or field.name not in metadata
             or not field.has_date_info
+            or field.has_millisecond_info
         ):
             continue
         naive_datetime = field.parse(metadata[field.name])
@@ -232,13 +247,18 @@ def capture_datetimes_are_consistent(file_path: Union[Path, str]) -> bool:
         other_datetime = _nullify_microseconds(other_datetime)
 
         if other_datetime != ref_datetime:
+            import ipdb
+
+            ipdb.set_trace()
             return False  # At least one datetime is different
 
     return True
 
 
 def set_capture_datetime(
-    file_paths: Union[Path, str, List[Union[Path, str]]], new_datetime: datetime
+    file_paths: Union[Path, str, List[Union[Path, str]]],
+    new_datetime: datetime,
+    timezone: Optional[timedelta] = None,
 ) -> None:
     if not isinstance(file_paths, list):
         file_paths = [file_paths]
@@ -251,6 +271,8 @@ def set_capture_datetime(
     exiftool_cmd.extend([str(f) for f in file_paths])
     with exiftool.ExifTool() as et:
         et.execute(*exiftool_cmd)
+
+    set_timezone(file_paths, timezone)
 
 
 def shift_capture_datetime(
@@ -329,3 +351,9 @@ def _print_all_exif_datetimes(file_path: Union[Path, str]) -> None:
     for field in metadata.keys():
         if "time" in field.lower() or "date" in field.lower():
             print(f"{field}: {metadata[field]}")
+
+
+def set_timezone(
+    file_paths: Union[Path, str, List[Union[Path, str]]], timezone: timedelta
+) -> None:
+    return

@@ -34,7 +34,7 @@ def test_get_capture_datetime_video(test_vid):
 
 def test_set_capture_datetime_one_at_a_time(test_media_file):
     old_date = get_capture_datetime(test_media_file)
-    new_date = datetime(2023, 5, 20, 15, 20, 0)
+    new_date = datetime(2023, 5, 20, 15, 20, 33)
     assert old_date != new_date
 
     set_capture_datetime(test_media_file, new_date)
@@ -44,7 +44,7 @@ def test_set_capture_datetime_one_at_a_time(test_media_file):
 
 def test_set_capture_datetime_many_at_a_time(test_media_files):
     old_dates = [get_capture_datetime(f) for f in test_media_files]
-    new_date = datetime(2023, 5, 20, 15, 20, 0)
+    new_date = datetime(2023, 5, 20, 15, 20, 33)
     assert all([old_date != new_date for old_date in old_dates])
 
     set_capture_datetime(test_media_files, new_date)
@@ -148,14 +148,11 @@ def test_shift_capture_datetime_many_at_a_time_positive_shift(
     assert capture_datetimes_are_consistent(test_vid)
 
 
-def test_determine_timezone_img(test_img_phone):
-    assert determine_timezone(test_img_phone) == timezone(
-        timedelta(seconds=7201, microseconds=975657)
-    )
+def test_determine_timezone_img_phone(test_img_phone):
+    assert determine_timezone(test_img_phone) == timezone(timedelta(seconds=7201))
 
 
 def test_determine_timezone_img_camera(test_img_camera):
-    _print_all_exif_datetimes(test_img_camera)
     assert determine_timezone(test_img_camera) == timezone(timedelta(hours=2))
 
 

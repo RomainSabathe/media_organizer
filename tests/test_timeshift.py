@@ -54,10 +54,30 @@ def test_shift_capture_datetime_photo(test_img):
     assert capture_datetimes_are_consistent(test_img)
 
 
+def test_shift_capture_datetime_photo_positive_shift(test_img):
+    # From a previous test, we know that the original date is 2023-05-17 09:30:03.
+    datetime_shift = timedelta(hours=3, minutes=-5, seconds=13)
+    expected_date = datetime(2023, 5, 17, 12, 25, 16)
+
+    shift_capture_datetime(test_img, datetime_shift)
+    assert get_capture_datetime(test_img) == expected_date
+    assert capture_datetimes_are_consistent(test_img)
+
+
 def test_shift_capture_datetime_video(test_vid):
     # From a previous test, we know that original date is 2022-04-30 09:33:07.
     datetime_shift = timedelta(hours=-2, minutes=47, seconds=13)
     expected_date = datetime(2022, 4, 30, 8, 20, 20)
+
+    shift_capture_datetime(test_vid, datetime_shift)
+    assert get_capture_datetime(test_vid) == expected_date
+    assert capture_datetimes_are_consistent(test_vid)
+
+
+def test_shift_capture_datetime_video_positive_shift(test_vid):
+    # From a previous test, we know that original date is 2022-04-30 09:33:07.
+    datetime_shift = timedelta(hours=3, minutes=-5, seconds=13)
+    expected_date = datetime(2022, 4, 30, 12, 28, 20)
 
     shift_capture_datetime(test_vid, datetime_shift)
     assert get_capture_datetime(test_vid) == expected_date
@@ -69,6 +89,19 @@ def test_shift_capture_datetime_many_at_a_time(test_img, test_vid):
     expected_date_img = datetime(2023, 5, 17, 8, 17, 16)
     expected_date_vid = datetime(2022, 4, 30, 8, 20, 20)
     datetime_shift = timedelta(hours=-2, minutes=47, seconds=13)
+
+    shift_capture_datetime([test_img, test_vid], datetime_shift)
+    assert get_capture_datetime(test_img) == expected_date_img
+    assert get_capture_datetime(test_vid) == expected_date_vid
+    assert capture_datetimes_are_consistent(test_img)
+    assert capture_datetimes_are_consistent(test_vid)
+
+
+def test_shift_capture_datetime_many_at_a_time_positive_shift(test_img, test_vid):
+    # See previous tests for explanation of these dates.
+    expected_date_img = datetime(2023, 5, 17, 12, 25, 16)
+    expected_date_vid = datetime(2022, 4, 30, 12, 28, 20)
+    datetime_shift = timedelta(hours=3, minutes=-5, seconds=13)
 
     shift_capture_datetime([test_img, test_vid], datetime_shift)
     assert get_capture_datetime(test_img) == expected_date_img

@@ -220,6 +220,10 @@ def shift_capture_datetime(
     file_paths = [_format_file_path(f) for f in file_paths]
 
     exiftool_cmd = []
+    # Important note: we *don't* use the "-AllDates+=..." option because it
+    # doesn't update some fields (e.g. QuickTime:MediaCreateDate).
+    # Explicitely iterating over each identified datetimefield ensures that
+    # indeed all fields are updated.
     for field in DATETIME_FIELDS:
         datetime_shift_copy = datetime_shift
         # We must apply special care to the following case (when both of the

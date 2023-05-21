@@ -30,7 +30,7 @@ class ExifDateTimeField:
         return format.strip()
 
     def parse(self, field_content: str) -> datetime:
-        if self.has_timezone_info:
+        if self.has_timezone_info and not self.is_utc:
             # Sometimes, timezones are expressed like this: +01:00 instead of +0100.
             # We need to convert it to the latter format.
             time_parts, tz_offset_str = (
@@ -150,9 +150,6 @@ def determine_timezone(
         # For some media (typically: GoPro videos), we simply can't access the timezone
         # info from the datetime fields. Using GPS data is the only other option.
         # TODO: Implement this.
-        import ipdb
-
-        ipdb.set_trace()
         return None
 
     # We do the same, this time looking for a field that has no timezone info.
@@ -168,9 +165,6 @@ def determine_timezone(
 
     # We then calculate the difference between the two datetimes.
     diff = naive_datetime - utc_datetime.replace(tzinfo=None)
-    import ipdb
-
-    ipdb.set_trace()
     return timezone(diff)
 
 

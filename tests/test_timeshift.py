@@ -10,11 +10,19 @@ from media_organizer.timeshift import (
 )
 
 
-def test_get_capture_datetime_photo(test_img):
-    # TODO: add other `test_img` coming from different cameras (1 phone, 1 GoPro, 1 Fuji)
+def test_get_capture_datetime_photo_phone(test_img_phone):
+    # TODO: add other `test_img_phone` coming from different cameras (1 phone, 1 GoPro, 1 Fuji)
     expected_date = datetime(2023, 5, 17, 9, 30, 3)
-    assert get_capture_datetime(test_img) == expected_date
-    assert capture_datetimes_are_consistent(test_img)
+    assert get_capture_datetime(test_img_phone) == expected_date
+    assert capture_datetimes_are_consistent(test_img_phone)
+
+
+def test_get_capture_datetime_photo_camera(test_img_camera):
+    # TODO: add other `test_img_phone` coming from different cameras (1 phone, 1 GoPro, 1 Fuji)
+    expected_date = datetime(2019, 12, 17, 12, 3, 24)
+    assert get_capture_datetime(test_img_camera) == expected_date
+    assert capture_datetimes_are_consistent(test_img_camera)
+    _print_all_exif_datetimes(test_img_camera)
 
 
 def test_get_capture_datetime_video(test_vid):
@@ -44,24 +52,24 @@ def test_set_capture_datetime_many_at_a_time(test_media_files):
     assert all([capture_datetimes_are_consistent(f) for f in test_media_files])
 
 
-def test_shift_capture_datetime_photo(test_img):
+def test_shift_capture_datetime_photo_phone(test_img_phone):
     # From a previous test, we know that the original date is 2023-05-17 09:30:03.
     datetime_shift = timedelta(hours=-2, minutes=47, seconds=13)
     expected_date = datetime(2023, 5, 17, 8, 17, 16)
 
-    shift_capture_datetime(test_img, datetime_shift)
-    assert get_capture_datetime(test_img) == expected_date
-    assert capture_datetimes_are_consistent(test_img)
+    shift_capture_datetime(test_img_phone, datetime_shift)
+    assert get_capture_datetime(test_img_phone) == expected_date
+    assert capture_datetimes_are_consistent(test_img_phone)
 
 
-def test_shift_capture_datetime_photo_positive_shift(test_img):
+def test_shift_capture_datetime_photo_phone_positive_shift(test_img_phone):
     # From a previous test, we know that the original date is 2023-05-17 09:30:03.
     datetime_shift = timedelta(hours=3, minutes=-5, seconds=13)
     expected_date = datetime(2023, 5, 17, 12, 25, 16)
 
-    shift_capture_datetime(test_img, datetime_shift)
-    assert get_capture_datetime(test_img) == expected_date
-    assert capture_datetimes_are_consistent(test_img)
+    shift_capture_datetime(test_img_phone, datetime_shift)
+    assert get_capture_datetime(test_img_phone) == expected_date
+    assert capture_datetimes_are_consistent(test_img_phone)
 
 
 def test_shift_capture_datetime_video(test_vid):
@@ -84,38 +92,47 @@ def test_shift_capture_datetime_video_positive_shift(test_vid):
     assert capture_datetimes_are_consistent(test_vid)
 
 
-def test_shift_capture_datetime_many_at_a_time(test_img, test_vid):
+def test_shift_capture_datetime_many_at_a_time(test_img_phone, test_vid):
     # See previous tests for explanation of these dates.
     expected_date_img = datetime(2023, 5, 17, 8, 17, 16)
     expected_date_vid = datetime(2022, 4, 30, 8, 20, 20)
     datetime_shift = timedelta(hours=-2, minutes=47, seconds=13)
 
-    shift_capture_datetime([test_img, test_vid], datetime_shift)
-    assert get_capture_datetime(test_img) == expected_date_img
+    shift_capture_datetime([test_img_phone, test_vid], datetime_shift)
+    assert get_capture_datetime(test_img_phone) == expected_date_img
     assert get_capture_datetime(test_vid) == expected_date_vid
-    assert capture_datetimes_are_consistent(test_img)
+    assert capture_datetimes_are_consistent(test_img_phone)
     assert capture_datetimes_are_consistent(test_vid)
 
 
-def test_shift_capture_datetime_many_at_a_time_positive_shift(test_img, test_vid):
+def test_shift_capture_datetime_many_at_a_time_positive_shift(test_img_phone, test_vid):
     # See previous tests for explanation of these dates.
     expected_date_img = datetime(2023, 5, 17, 12, 25, 16)
     expected_date_vid = datetime(2022, 4, 30, 12, 28, 20)
     datetime_shift = timedelta(hours=3, minutes=-5, seconds=13)
 
-    shift_capture_datetime([test_img, test_vid], datetime_shift)
-    assert get_capture_datetime(test_img) == expected_date_img
+    shift_capture_datetime([test_img_phone, test_vid], datetime_shift)
+    assert get_capture_datetime(test_img_phone) == expected_date_img
     assert get_capture_datetime(test_vid) == expected_date_vid
-    assert capture_datetimes_are_consistent(test_img)
+    assert capture_datetimes_are_consistent(test_img_phone)
     assert capture_datetimes_are_consistent(test_vid)
 
 
-def test_determine_timezone_img(test_img):
-    assert determine_timezone(test_img) == timezone(
+def test_determine_timezone_img(test_img_phone):
+    assert determine_timezone(test_img_phone) == timezone(
         timedelta(seconds=7201, microseconds=975657)
     )
+
+
+def test_determine_timezone_img_camera(test_img_camera):
+    assert determine_timezone(test_img_camera) == timezone(timedelta(hours=2))
 
 
 def test_determine_timezone_video(test_vid):
     # GoPro videos don't provide datetime fields with timezone info.
     assert determine_timezone(test_vid) is None
+
+
+def test_set_timezone(test_img_phone):
+    # TODO: implement this function.
+    assert False

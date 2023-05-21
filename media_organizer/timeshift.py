@@ -7,9 +7,10 @@ from datetime import datetime, timezone, timedelta
 import exiftool
 
 
-@dataclass
+@dataclass(frozen=True)
 class ExifDateTimeField:
     name: str
+    has_date_info: bool = True
     has_time_info: bool = True
     has_timezone_info: bool = False
     has_millisecond_info: bool = False
@@ -17,16 +18,30 @@ class ExifDateTimeField:
 
     @property
     def format(self) -> str:
-        format = "%Y:%m:%d"
+        format = ""
+        if self.has_date_info:
+            format += "%Y:%m:%d"
         if self.has_time_info:
             format += " %H:%M:%S"
             if self.has_millisecond_info:
                 format += ".%f"
         if self.has_timezone_info:
             format += "%z"
-        return format
+        return format.strip()
 
     def parse(self, field_content: str) -> datetime:
+        if self.has_timezone_info:
+            # Sometimes, timezones are expressed like this: +01:00 instead of +0100.
+            # We need to convert it to the latter format.
+            time_parts, tz_offset_str = (
+                field_content.split("+")
+                if "+" in field_content
+                else field_content.split("-")
+            )
+            sign = "+" if "+" in field_content else "-"
+            tz_offset_str = tz_offset_str.replace(":", "")
+            field_content = time_parts + sign + tz_offset_str
+
         dt = datetime.strptime(field_content, self.format)
         if self.has_timezone_info and dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
@@ -59,9 +74,16 @@ PHOTO_DATETIME_FIELDS = [
     ExifDateTimeField("Composite:SubSecModifyDate", has_millisecond_info=True),
     ExifDateTimeField("Composite:GPSDateTime", has_timezone_info=True, is_utc=True),
     ExifDateTimeField("Composite:GPSDateTimeCreated", has_timezone_info=True),
+    ExifDateTimeField(
+        "Composite:DateTimeCreated", has_timezone_info=True, is_utc=False
+    ),
+    ExifDateTimeField("XMP:DateCreated"),
+    ExifDateTimeField("XMP:CreateDate"),
     ExifDateTimeField("XMP:DateTimeDigitized", has_timezone_info=True),
     ExifDateTimeField("XMP:DateTimeOriginal", has_timezone_info=True),
     ExifDateTimeField("XMP:GPSDateTime", has_timezone_info=True, is_utc=True),
+    ExifDateTimeField("IPTC:DateCreated", has_time_info=False),
+    ExifDateTimeField("IPTC:TimeCreated", has_date_info=False, has_timezone_info=True),
 ]
 VIDEO_DATETIME_FIELDS = [
     ExifDateTimeField("QuickTime:CreateDate"),
@@ -97,28 +119,58 @@ def determine_timezone(
     if metadata is None:
         metadata = extract_metadata_using_exiftool(file_path)
 
+    # Sometimes, we directly have access to fields that have:
+    # - timezone info
+    # - are *not* expressed in UTC
+    # In which case, we can directly use the non-UTC timezone as source of truth.
+    for field in DATETIME_FIELDS:
+        if (
+            field.has_timezone_info
+            and not field.is_utc
+            and field.name in metadata
+            and field.has_date_info
+        ):
+            return field.parse(metadata[field.name]).tzinfo
+
+    # Otherwise, we need to manually compute the timezone by looking at the difference between
+    # naive-datetime and UTC-datetime.
     # We first start by identifying a non-null Exif datetime field that has UTC offset information.
     utc_datetime = None
     for field in DATETIME_FIELDS:
         if (
-            not field.has_timezone_info and not field.is_utc
-        ) or field.name not in metadata:
+            not field.has_timezone_info
+            or not field.is_utc
+            or field.name not in metadata
+            or not field.has_date_info
+        ):
             continue
         utc_datetime = field.parse(metadata[field.name])
+        break
     if utc_datetime is None:
         # For some media (typically: GoPro videos), we simply can't access the timezone
         # info from the datetime fields. Using GPS data is the only other option.
         # TODO: Implement this.
+        import ipdb
+
+        ipdb.set_trace()
         return None
 
     # We do the same, this time looking for a field that has no timezone info.
     for field in DATETIME_FIELDS:
-        if field.has_timezone_info or field.name not in metadata:
+        if (
+            field.has_timezone_info
+            or field.name not in metadata
+            or not field.has_date_info
+        ):
             continue
         naive_datetime = field.parse(metadata[field.name])
+        break
 
     # We then calculate the difference between the two datetimes.
     diff = naive_datetime - utc_datetime.replace(tzinfo=None)
+    import ipdb
+
+    ipdb.set_trace()
     return timezone(diff)
 
 
@@ -170,8 +222,12 @@ def capture_datetimes_are_consistent(file_path: Union[Path, str]) -> bool:
 
     # We check that all other datetimes are equal to the reference.
     for datetime_key in datetime_keys[1:]:
-        if datetime_key.has_time_info ^ ref_datetime_key.has_time_info:
-            # If one datetime has time info and the other doesn't, we cannot compare them.
+        if (
+            datetime_key.has_time_info ^ ref_datetime_key.has_time_info
+            or datetime_key.has_date_info ^ ref_datetime_key.has_date_info
+        ):
+            # If one datetime has time info and the other doesn't, we can't compare them.
+            # Same for date info.
             continue
 
         other_datetime = datetimes[datetime_key]

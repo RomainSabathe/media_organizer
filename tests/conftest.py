@@ -8,8 +8,19 @@ THIS_DIR = Path(__file__).resolve().parent
 
 
 @pytest.fixture
-def test_img(tmp_path):
+def test_img_phone(tmp_path):
     file_path = THIS_DIR / "data" / "test_img_phone.jpg"
+
+    # Creating a copy of the file so that we don't modify the original file.
+    temp_file_path = tmp_path / file_path.name
+    shutil.copy2(file_path, temp_file_path)
+
+    yield temp_file_path
+
+
+@pytest.fixture
+def test_img_camera(tmp_path):
+    file_path = THIS_DIR / "data" / "test_img_camera.jpg"
 
     # Creating a copy of the file so that we don't modify the original file.
     temp_file_path = tmp_path / file_path.name
@@ -37,11 +48,11 @@ def tmp_path(tmp_path):
 
 
 @pytest.fixture
-def test_media_files(test_img, test_vid):
-    return [test_img, test_vid]
+def test_media_files(test_img_phone, test_vid):
+    return [test_img_phone, test_vid]
 
 
-@pytest.fixture(params=["test_img", "test_vid"])
+@pytest.fixture(params=["test_img_phone", "test_vid"])
 def test_media_file(request):
     """Provides a copy of the photo or video that needs to be timeshifted.
     The reason we provide a copy is so that we don't modify the original file.

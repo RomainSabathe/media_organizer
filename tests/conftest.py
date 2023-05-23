@@ -43,8 +43,8 @@ def test_vid(tmp_path):
 @pytest.fixture
 def tmp_path(tmp_path):
     # Allows for easier debugging (just replace tmp_path by whatever you like).
-    # return Path("C:/Users/RSaba/git/media_organizer/tests/data/tmp")
-    return tmp_path
+    return Path("C:/Users/RSaba/git/media_organizer/tests/data/tmp")
+    # return tmp_path
 
 
 @pytest.fixture
@@ -58,5 +58,12 @@ def test_media_file(request):
     The reason we provide a copy is so that we don't modify the original file.
     This fixture differs from `target_media_files` in that it only provides one file at a time.
     """
+    media_file = request.getfixturevalue(request.param)
+    return media_file
+
+
+@pytest.fixture(params=["test_img_phone", "test_img_camera"])
+def test_img(request):
+    """Fixture to iterate over all test images."""
     media_file = request.getfixturevalue(request.param)
     return media_file

@@ -12,6 +12,8 @@ from media_organizer.timeshift import (
     capture_datetimes_are_consistent,
     extract_metadata_using_exiftool,
     _print_all_exif_datetimes,
+    _print_all_exif_gps_info,
+    ProtectedExifAttributes,
 )
 
 
@@ -177,14 +179,27 @@ def test_set_timezone_img_phone(test_img_phone, new_timezone):
     assert get_capture_datetime(test_img_phone) == expected_date
 
 
-def test_google_photos(test_img_phone):
+# We test both positive and negative timezone shifts.
+@pytest.mark.parametrize("new_timezone", [timedelta(hours=6), timedelta(hours=-8)])
+def test_set_timezone_video(test_vid, new_timezone):
+    expected_date = datetime(2022, 4, 30, 9, 33, 7)
+    assert get_capture_datetime(test_vid) == expected_date
+
+    set_timezone(test_vid, new_timezone)
+    _print_all_exif_datetimes(test_vid)
+    # assert get_timezone(test_vid) == timezone(new_timezone)
+    # assert get_capture_datetime(test_vid) == expected_date
+
+
+def test_google_photos(test_img_phone, test_vid):
     # test_img_phone = (
     #    "C:/Users/RSaba/git/media_organizer/tests/data/tmp/test_img_phone.jpg"
     # )
+    test_img_phone = test_vid
     set_capture_datetime(test_img_phone, datetime(2023, 5, 21, 16, 10, 00))
     remove_gps_info(test_img_phone)
     # _print_all_exif_datetimes(test_img_phone)
-    set_timezone(test_img_phone, None)
+    set_timezone(test_img_phone, timedelta(hours=8))
     _print_all_exif_datetimes(test_img_phone)
 
 
@@ -209,10 +224,22 @@ def test_determine_timezone_when_gps_info_is_not_available():
     assert False
 
 
-def test_remove_gps_info(test_img_phone):
-    metadata = extract_metadata_using_exiftool(test_img_phone)
-    assert metadata.get("EXIF:GPSLongitude") is not None
+def test_remove_gps_info_photos(test_img):
+    gps_fields = ["EXIF:GPSLongitude", "QuickTime:GPSCoordinates", "GoPro:GPSLatitude"]
 
-    remove_gps_info(test_img_phone)
-    metadata = extract_metadata_using_exiftool(test_img_phone)
-    assert metadata.get("EXIF:GPSLongitude") is None
+    metadata = extract_metadata_using_exiftool(test_img)
+    if all([metadata.get(gps_field) is None for gps_field in gps_fields]):
+        # The file didn't have any GPS info to begin with.
+        return
+    assert any([metadata.get(gps_field) is not None for gps_field in gps_fields])
+
+    remove_gps_info(test_img)
+    metadata = extract_metadata_using_exiftool(test_img)
+    assert all([metadata.get(gps_field) is None for gps_field in gps_fields])
+
+
+def test_remove_gps_info_video(test_vid):
+    # We can't remove GPS info from GoPro videos because it's stored in an
+    # embedded field of Exif metadata.
+    with pytest.raises(ProtectedExifAttributes):
+        remove_gps_info(test_vid)

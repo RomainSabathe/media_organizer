@@ -8,6 +8,12 @@ import exiftool
 
 
 @dataclass(frozen=True)
+class ExifGPSField:
+    name: str
+    is_embedded: bool = False
+
+
+@dataclass(frozen=True)
 class ExifDateTimeField:
     name: str
     has_date_info: bool = True
@@ -84,14 +90,14 @@ PHOTO_DATETIME_FIELDS = [
     ExifDateTimeField("EXIF:CreateDate"),
     ExifDateTimeField("EXIF:GPSTimeStamp", has_date_info=False, is_gps_related=True),
     ExifDateTimeField("EXIF:GPSDateStamp", has_time_info=False, is_gps_related=True),
-    ExifDateTimeField("Composite:SubSecCreateDate", has_millisecond_info=True),
-    ExifDateTimeField("Composite:SubSecDateTimeOriginal", has_millisecond_info=True),
-    ExifDateTimeField("Composite:SubSecModifyDate", has_millisecond_info=True),
-    ExifDateTimeField("Composite:GPSDateTime", has_timezone_info=True, is_utc=True),
-    ExifDateTimeField("Composite:GPSDateTimeCreated", has_timezone_info=True),
-    ExifDateTimeField(
-        "Composite:DateTimeCreated", has_timezone_info=True, is_utc=False
-    ),
+    # ExifDateTimeField("Composite:SubSecCreateDate", has_millisecond_info=True),
+    # ExifDateTimeField("Composite:SubSecDateTimeOriginal", has_millisecond_info=True),
+    # ExifDateTimeField("Composite:SubSecModifyDate", has_millisecond_info=True),
+    # ExifDateTimeField("Composite:GPSDateTime", has_timezone_info=True, is_utc=True),
+    # ExifDateTimeField("Composite:GPSDateTimeCreated", has_timezone_info=True),
+    # ExifDateTimeField(
+    #    "Composite:DateTimeCreated", has_timezone_info=True, is_utc=False
+    # ),
     ExifDateTimeField("XMP:DateCreated"),
     ExifDateTimeField("XMP:CreateDate"),
     ExifDateTimeField("XMP:DateTimeDigitized", has_timezone_info=True),
@@ -110,33 +116,31 @@ VIDEO_DATETIME_FIELDS = [
     ExifDateTimeField("QuickTime:TrackModifyDate"),
     ExifDateTimeField("QuickTime:MediaCreateDate"),
     ExifDateTimeField("QuickTime:MediaModifyDate"),
+    ExifDateTimeField("QuickTime:UTC", has_timezone_info=True, is_utc=False),
 ]
 DATETIME_FIELDS = PHOTO_DATETIME_FIELDS + VIDEO_DATETIME_FIELDS
 
 GPS_FIELDS = [
-    "EXIF:GPSVersionID",
-    "EXIF:GPSLatitudeRef",
-    "EXIF:GPSLatitude",
-    "EXIF:GPSLongitudeRef",
-    "EXIF:GPSLongitude",
-    "EXIF:GPSAltitudeRef",
-    "EXIF:GPSAltitude",
-    "EXIF:GPSTimeStamp",
-    "EXIF:GPSProcessingMethod",
-    "EXIF:GPSDateStamp",
-    "EXIF:GPSDifferential",
-    "Composite:GPSLatitude",
-    "Composite:GPSLongitude",
-    "Composite:GPSPosition",
-    "Composite:GPSAltitude",
-    "Composite:GPSAltitudeRef",
-    "Composite:GPSDateTime",
-    "Composite:GPSLatitudeRef",
-    "Composite:GPSLongitudeRef",
-    "Composite:GPSMapDatum",
-    "Composite:GPSProcessingMethod",
-    "Composite:GPSPosition",
-    "Composite:GPSSatellites",
+    ExifGPSField("EXIF:GPSVersionID"),
+    ExifGPSField("EXIF:GPSLatitudeRef"),
+    ExifGPSField("EXIF:GPSLatitude"),
+    ExifGPSField("EXIF:GPSLongitudeRef"),
+    ExifGPSField("EXIF:GPSLongitude"),
+    ExifGPSField("EXIF:GPSAltitudeRef"),
+    ExifGPSField("EXIF:GPSAltitude"),
+    ExifGPSField("EXIF:GPSTimeStamp"),
+    ExifGPSField("EXIF:GPSProcessingMethod"),
+    ExifGPSField("EXIF:GPSDateStamp"),
+    ExifGPSField("EXIF:GPSDifferential"),
+    ExifGPSField("QuickTime:GPSCoordinates"),
+    ExifGPSField("GoPro:GPSMeasureMode", is_embedded=True),
+    ExifGPSField("GoPro:GPSDateTime", is_embedded=True),
+    ExifGPSField("GoPro:GPSHPositioningError", is_embedded=True),
+    ExifGPSField("GoPro:GPSLatitude", is_embedded=True),
+    ExifGPSField("GoPro:GPSLongitude", is_embedded=True),
+    ExifGPSField("GoPro:GPSAltitude", is_embedded=True),
+    ExifGPSField("GoPro:GPSSpeed", is_embedded=True),
+    ExifGPSField("GoPro:GPSSpeed3D", is_embedded=True),
 ]
 
 
@@ -144,7 +148,9 @@ def extract_metadata_using_exiftool(file_path: Union[Path, str]) -> dict:
     file_path = _format_file_path(file_path)
 
     with exiftool.ExifTool() as et:
-        metadata = et.execute_json(str(file_path))
+        metadata = et.execute_json(
+            *["-ee", str(file_path)]
+        )  # -ee = ExtractEmbedded. Allows to extract metadata from embedded files (e.g. XMP in JPEG)
         if len(metadata) == 0:
             raise ValueError(f"No metadata found for {file_path}")
         if len(metadata) > 1:
@@ -418,8 +424,18 @@ def _print_all_exif_datetimes(file_path: Union[Path, str]) -> None:
     This is useful for debugging purposes."""
     metadata = extract_metadata_using_exiftool(file_path)
     for field in metadata.keys():
-        # if "time" in field.lower() or "date" in field.lower():
-        if "gps" in field.lower():
+        _field = field.lower().replace("quicktime", "")
+        if "time" in _field or "date" in _field or "utc" in _field:
+            print(f"{field}: {metadata[field]}")
+
+
+def _print_all_exif_gps_info(file_path: Union[Path, str]) -> None:
+    """Prints all EXIF GPS-related fields found in a file.
+    This is useful for debugging purposes."""
+    metadata = extract_metadata_using_exiftool(file_path)
+    for field in metadata.keys():
+        _field = field.lower().replace("quicktime", "")
+        if "gps" in _field:
             print(f"{field}: {metadata[field]}")
 
 
@@ -462,7 +478,11 @@ def set_timezone(
                 + timezone_str
                 + "/}"
             )
-        exiftool_cmd.append(arg)
+        # arg = "-{field.name}<$" + "{createdate}" + timezone_str + "}"
+        # exiftool_cmd.append(arg)
+
+    exiftool_cmd.append("-api")
+    exiftool_cmd.append("-QuickTimeUTC=1")
 
     exiftool_cmd.extend([str(f) for f in file_paths])
     with exiftool.ExifTool() as et:
@@ -470,14 +490,46 @@ def set_timezone(
 
 
 def remove_gps_info(file_paths: Union[Path, str, List[Union[Path, str]]]):
+    """Removes all GPS-related EXIF fields from a file.
+
+    This function will raise an error if the file contains any embedded GPS data.
+    Embedded GPS can arise for instance in GoPro videos. Those can't be
+    deleted from the file using ExifTool.
+    """
     if not isinstance(file_paths, list):
         file_paths = [file_paths]
     file_paths = [_format_file_path(f) for f in file_paths]
 
+    # First we read what GPS fields are available to understand if all of them
+    # can be removed.
+    # TODO: expand the extract_metadata_using_exiftool function to return
+    # a list of dicts (1 per input file).
+    metadata = extract_metadata_using_exiftool(file_paths[0])
+    has_gps_info = False  # If there's no GPS info, we don't need to do anything.
+    for gps_field in GPS_FIELDS:
+        if gps_field.name in metadata:
+            has_gps_info = True
+            if gps_field.is_embedded:
+                raise ProtectedExifAttributes(
+                    f"Can't remove {gps_field.name} because it's an embedded attribute."
+                )
+    if not has_gps_info:
+        return
+
     exiftool_cmd = []
     for field in GPS_FIELDS:
-        exiftool_cmd.append(f"-{field}=")
+        exiftool_cmd.append(f"-{field.name}=")
 
     exiftool_cmd.extend([str(f) for f in file_paths])
     with exiftool.ExifTool() as et:
         et.execute(*exiftool_cmd)
+
+
+class ProtectedExifAttributes(Exception):
+    """Some EXIF metadata are so-called embedded. To access them, we need
+    to use the -ee argument of ExifTool. This allows us to _read_ the attribute,
+    but not to _set_ it.
+    When the user is trying to do that (for instance when removing GPS info),
+    we raise this exception."""
+
+    pass

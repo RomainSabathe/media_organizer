@@ -43,8 +43,8 @@ def test_vid(tmp_path):
 @pytest.fixture
 def tmp_path(tmp_path):
     # Allows for easier debugging (just replace tmp_path by whatever you like).
-    return Path("C:/Users/RSaba/git/media_organizer/tests/data/tmp")
-    # return tmp_path
+    # return Path("C:/Users/RSaba/git/media_organizer/tests/data/tmp")
+    return tmp_path
 
 
 @pytest.fixture

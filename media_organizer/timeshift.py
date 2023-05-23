@@ -18,7 +18,6 @@ class ExifDateTimeField:
     has_timezone_info: bool = False
     has_millisecond_info: bool = False
     is_utc: bool = False
-    is_gps_related: bool = False
 
     @property
     def format(self) -> str:
@@ -85,24 +84,22 @@ PHOTO_DATETIME_FIELDS = [
     ExifDateTimeField("EXIF:ModifyDate"),
     ExifDateTimeField("EXIF:DateTimeOriginal"),
     ExifDateTimeField("EXIF:CreateDate"),
-    ExifDateTimeField("EXIF:GPSTimeStamp", has_date_info=False, is_gps_related=True),
-    ExifDateTimeField("EXIF:GPSDateStamp", has_time_info=False, is_gps_related=True),
-    # ExifDateTimeField("Composite:SubSecCreateDate", has_millisecond_info=True),
-    # ExifDateTimeField("Composite:SubSecDateTimeOriginal", has_millisecond_info=True),
-    # ExifDateTimeField("Composite:SubSecModifyDate", has_millisecond_info=True),
-    # ExifDateTimeField("Composite:GPSDateTime", has_timezone_info=True, is_utc=True),
-    # ExifDateTimeField("Composite:GPSDateTimeCreated", has_timezone_info=True),
-    # ExifDateTimeField(
-    #    "Composite:DateTimeCreated", has_timezone_info=True, is_utc=False
-    # ),
+    ExifDateTimeField("EXIF:GPSTimeStamp", has_date_info=False),
+    ExifDateTimeField("EXIF:GPSDateStamp", has_time_info=False),
+    ExifDateTimeField("Composite:SubSecCreateDate", has_millisecond_info=True),
+    ExifDateTimeField("Composite:SubSecDateTimeOriginal", has_millisecond_info=True),
+    ExifDateTimeField("Composite:SubSecModifyDate", has_millisecond_info=True),
+    ExifDateTimeField("Composite:GPSDateTime", has_timezone_info=True, is_utc=True),
+    ExifDateTimeField("Composite:GPSDateTimeCreated", has_timezone_info=True),
+    ExifDateTimeField(
+        "Composite:DateTimeCreated", has_timezone_info=True, is_utc=False
+    ),
     ExifDateTimeField("XMP:DateCreated"),
     ExifDateTimeField("XMP:CreateDate"),
     ExifDateTimeField("XMP:DateTimeDigitized", has_timezone_info=True),
     ExifDateTimeField("XMP:DateTimeOriginal", has_timezone_info=True),
     ExifDateTimeField("XMP:ModifyDate", has_timezone_info=True),
-    ExifDateTimeField(
-        "XMP:GPSDateTime", has_timezone_info=True, is_utc=True, is_gps_related=True
-    ),
+    ExifDateTimeField("XMP:GPSDateTime", has_timezone_info=True, is_utc=True),
     ExifDateTimeField("IPTC:DateCreated", has_time_info=False),
     ExifDateTimeField("IPTC:TimeCreated", has_date_info=False, has_timezone_info=True),
 ]
@@ -492,8 +489,8 @@ def set_timezone(
                 + timezone_str
                 + "/}"
             )
-        # arg = "-{field.name}<$" + "{createdate}" + timezone_str + "}"
-        # exiftool_cmd.append(arg)
+            arg = f"-{field.name}<$" + "{createdate}" + timezone_str
+            exiftool_cmd.append(arg)
 
     exiftool_cmd.append("-api")
     exiftool_cmd.append("-QuickTimeUTC=1")

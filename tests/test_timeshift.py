@@ -247,10 +247,28 @@ def test_remove_gps_info_video(test_vid):
         remove_gps_info(test_vid)
 
 
-def test_get_timezone_from_gps_coords(test_img_phone):
+def test_get_timezone_from_gps_coords_img_phone(test_img_phone):
     metadata = extract_metadata_using_exiftool(test_img_phone)
     extracted_timezone = gps_coords_to_timezone(
         GPSCoordinates.from_exif_metadata(metadata)
     )
     expected_timezone = timezone(timedelta(hours=2))
+    assert extracted_timezone == expected_timezone
+
+
+def test_get_timezone_from_gps_coords_img_camera(test_img_camera):
+    metadata = extract_metadata_using_exiftool(test_img_camera)
+    with pytest.raises(ValueError):
+        # We have no GPS info on most camera files.
+        extracted_timezone = gps_coords_to_timezone(
+            GPSCoordinates.from_exif_metadata(metadata)
+        )
+
+
+def test_get_timezone_from_gps_coords_vid(test_vid):
+    metadata = extract_metadata_using_exiftool(test_vid)
+    extracted_timezone = gps_coords_to_timezone(
+        GPSCoordinates.from_exif_metadata(metadata)
+    )
+    expected_timezone = timezone(timedelta(hours=+3))  # Madagascar
     assert extracted_timezone == expected_timezone

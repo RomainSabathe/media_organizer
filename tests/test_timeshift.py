@@ -13,6 +13,8 @@ from media_organizer.timeshift import (
     extract_metadata_using_exiftool,
     _print_all_exif_datetimes,
     _print_all_exif_gps_info,
+    gps_coords_to_timezone,
+    GPSCoordinates,
     ProtectedExifAttributes,
 )
 
@@ -243,3 +245,12 @@ def test_remove_gps_info_video(test_vid):
     # embedded field of Exif metadata.
     with pytest.raises(ProtectedExifAttributes):
         remove_gps_info(test_vid)
+
+
+def test_get_timezone_from_gps_coords(test_img_phone):
+    metadata = extract_metadata_using_exiftool(test_img_phone)
+    extracted_timezone = gps_coords_to_timezone(
+        GPSCoordinates.from_exif_metadata(metadata)
+    )
+    expected_timezone = timezone(timedelta(hours=2))
+    assert extracted_timezone == expected_timezone

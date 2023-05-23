@@ -1,16 +1,13 @@
 """Functions for adjusting the capture datetime of media files (photos and videos) based on a source of truth."""
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Union, List, Optional, Dict
-from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
+
+import pytz
 import exiftool
-
-
-@dataclass(frozen=True)
-class ExifGPSField:
-    name: str
-    is_embedded: bool = False
+from timezonefinder import TimezoneFinder
 
 
 @dataclass(frozen=True)
@@ -120,25 +117,42 @@ VIDEO_DATETIME_FIELDS = [
 ]
 DATETIME_FIELDS = PHOTO_DATETIME_FIELDS + VIDEO_DATETIME_FIELDS
 
+
+@dataclass(frozen=True)
+class ExifGPSField:
+    name: str
+    is_embedded: bool = False
+    is_longitude: bool = False
+    is_latitude: bool = False
+    is_altitude: bool = False
+    is_multicoords: bool = False
+
+    @staticmethod
+    def to_gps_coords(exif_field) -> "GPSCoordinates":
+        """Used for the QuickTime:GPSCoords field which is a string
+        containing the longitude/latitude information."""
+        raise NotImplemented()
+
+
 GPS_FIELDS = [
     ExifGPSField("EXIF:GPSVersionID"),
     ExifGPSField("EXIF:GPSLatitudeRef"),
-    ExifGPSField("EXIF:GPSLatitude"),
+    ExifGPSField("EXIF:GPSLatitude", is_latitude=True),
     ExifGPSField("EXIF:GPSLongitudeRef"),
-    ExifGPSField("EXIF:GPSLongitude"),
+    ExifGPSField("EXIF:GPSLongitude", is_longitude=True),
     ExifGPSField("EXIF:GPSAltitudeRef"),
-    ExifGPSField("EXIF:GPSAltitude"),
+    ExifGPSField("EXIF:GPSAltitude", is_altitude=True),
     ExifGPSField("EXIF:GPSTimeStamp"),
     ExifGPSField("EXIF:GPSProcessingMethod"),
     ExifGPSField("EXIF:GPSDateStamp"),
     ExifGPSField("EXIF:GPSDifferential"),
-    ExifGPSField("QuickTime:GPSCoordinates"),
+    ExifGPSField("QuickTime:GPSCoordinates", is_multicoords=True),
     ExifGPSField("GoPro:GPSMeasureMode", is_embedded=True),
     ExifGPSField("GoPro:GPSDateTime", is_embedded=True),
     ExifGPSField("GoPro:GPSHPositioningError", is_embedded=True),
-    ExifGPSField("GoPro:GPSLatitude", is_embedded=True),
-    ExifGPSField("GoPro:GPSLongitude", is_embedded=True),
-    ExifGPSField("GoPro:GPSAltitude", is_embedded=True),
+    ExifGPSField("GoPro:GPSLatitude", is_embedded=True, is_latitude=True),
+    ExifGPSField("GoPro:GPSLongitude", is_embedded=True, is_longitude=True),
+    ExifGPSField("GoPro:GPSAltitude", is_embedded=True, is_altitude=True),
     ExifGPSField("GoPro:GPSSpeed", is_embedded=True),
     ExifGPSField("GoPro:GPSSpeed3D", is_embedded=True),
 ]
@@ -525,6 +539,43 @@ def remove_gps_info(file_paths: Union[Path, str, List[Union[Path, str]]]):
         et.execute(*exiftool_cmd)
 
 
+@dataclass
+class GPSCoordinates:
+    latitude: float
+    longitude: float
+
+    @staticmethod
+    def from_exif_metadata(metadata: Dict[str, str]) -> "GPSCoordinates":
+        latitude, longitude = None, None
+        for field in GPS_FIELDS:
+            if field.name not in metadata:
+                continue
+            if field.is_latitude:
+                latitude = metadata.get(field.name)
+            if field.is_longitude:
+                longitude = metadata.get(field.name)
+
+        if latitude is None or longitude is None:
+            raise ValueError("Metadata does not contain GPS information")
+
+        return GPSCoordinates(latitude, longitude)
+
+
+def gps_coords_to_timezone(coords: GPSCoordinates) -> datetime:
+    tf = TimezoneFinder()
+    timezone_str = tf.timezone_at(lng=coords.longitude, lat=coords.latitude)
+    if timezone_str is None:
+        raise UnknownTimezone()
+    pytz_timezone = pytz.timezone(timezone_str)
+
+    # Converting to datetime
+    now = datetime.now(pytz_timezone)
+    offset_seconds = now.utcoffset().total_seconds()
+    offset_hours = offset_seconds / 3600
+
+    return timezone(timedelta(hours=offset_hours))
+
+
 class ProtectedExifAttributes(Exception):
     """Some EXIF metadata are so-called embedded. To access them, we need
     to use the -ee argument of ExifTool. This allows us to _read_ the attribute,
@@ -532,4 +583,8 @@ class ProtectedExifAttributes(Exception):
     When the user is trying to do that (for instance when removing GPS info),
     we raise this exception."""
 
+    pass
+
+
+class UnknownTimezone(Exception):
     pass

@@ -173,6 +173,7 @@ def extract_metadata_using_exiftool(file_path: Union[Path, str]) -> dict:
 def get_timezone(
     file_path: Optional[Union[Path, str]] = None,
     metadata: Optional[Dict[str, str]] = None,
+    based_on_gps: bool = True,
 ) -> Union[timezone, None]:
     """Determine the timezone of a media file based on its metadata.
     -!- Warning: I know for sure this function does *not* have the same behavior
@@ -206,7 +207,17 @@ def get_timezone(
     ### There are multiple ways of obtaining the timezone of a media file.
     # In turn, we will try three methods.
 
-    # Method 1: directly use the timezone info from the metadata.
+    # Method 1: we use the GPS coordinate associated with the file
+    # (GooglePhotos does this)
+    if based_on_gps:
+        try:
+            gps_coords = GPSCoordinates.from_exif_metadata(metadata)
+            return gps_coords_to_timezone(gps_coords)
+        except ValueError:
+            # Is raised when there is no GPS information in the file.
+            pass
+
+    # Method 2: directly use the timezone info from the metadata.
     if "EXIF:OffsetTime" in metadata:
         offset = metadata["EXIF:OffsetTime"]  # e.g. "+01:00"
         sign = offset[0]
@@ -215,7 +226,7 @@ def get_timezone(
 
         return timezone(timedelta(minutes=int(f"{sign}{offset}")))
 
-    # Method 2: we have access to a field that comes with timezone info attached.
+    # Method 3: we have access to a field that comes with timezone info attached.
     # That is, a field that has:
     # - timezone info
     # - the timezone is *not* expressed in UTC
@@ -229,7 +240,7 @@ def get_timezone(
         ):
             return field.parse(metadata[field.name]).tzinfo
 
-    # Method 3: we need to manually compute the timezone by looking at the difference between
+    # Method 4: we need to manually compute the timezone by looking at the difference between
     # naive-datetime and UTC-datetime.
     # We first start by identifying a non-null Exif datetime field that has UTC offset information.
     utc_datetime = None
@@ -284,7 +295,9 @@ def get_capture_datetime(file_path: Union[Path, str]) -> datetime:
     return None  # Returns None if no capture date was found
 
 
-def capture_datetimes_are_consistent(file_path: Union[Path, str]) -> bool:
+def capture_datetimes_are_consistent(
+    file_path: Union[Path, str], timezone_aware: bool = True
+) -> bool:
     """There could be many EXIF fields related to capture datetime. This function checks that they are all consistent."""
     metadata = extract_metadata_using_exiftool(file_path)
     media_timezone = get_timezone(
@@ -307,10 +320,13 @@ def capture_datetimes_are_consistent(file_path: Union[Path, str]) -> bool:
     datetime_keys = list(datetimes.keys())
     ref_datetime_key = datetime_keys[0]
     ref_datetime = datetimes[ref_datetime_key]
-    if ref_datetime.tzinfo is None:
-        ref_datetime = ref_datetime.replace(tzinfo=media_timezone)
+    if timezone_aware:
+        if ref_datetime.tzinfo is None:
+            ref_datetime = ref_datetime.replace(tzinfo=media_timezone)
+        else:
+            ref_datetime = ref_datetime.astimezone(media_timezone)
     else:
-        ref_datetime = ref_datetime.astimezone(media_timezone)
+        ref_datetime = ref_datetime.replace(tzinfo=None)
     ref_datetime = _nullify_microseconds(ref_datetime)
 
     # We check that all other datetimes are equal to the reference.
@@ -324,14 +340,18 @@ def capture_datetimes_are_consistent(file_path: Union[Path, str]) -> bool:
             continue
 
         other_datetime = datetimes[datetime_key]
-        if other_datetime.tzinfo is None:
-            other_datetime = other_datetime.replace(tzinfo=media_timezone)
+        if timezone_aware:
+            if other_datetime.tzinfo is None:
+                other_datetime = other_datetime.replace(tzinfo=media_timezone)
+            else:
+                other_datetime = other_datetime.astimezone(media_timezone)
         else:
-            other_datetime = other_datetime.astimezone(media_timezone)
+            other_datetime = other_datetime.replace(tzinfo=None)
         other_datetime = _nullify_microseconds(other_datetime)
 
-        if other_datetime != ref_datetime:
-            return False  # At least one datetime is different
+        if abs((other_datetime - ref_datetime).total_seconds()) > 1:
+            # If the difference less than 1 second, we still consider the datetimes consistent.
+            return False
 
     return True
 
@@ -340,7 +360,7 @@ def set_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]], new_datetime: datetime
 ) -> None:
     """Sets the capture datetime of the given file(s) to the given datetime.
-    Warning: this function will erase the timezone information of the different files.
+    !! Warning !!: this function will erase the timezone information of the different files.
     The new datetime will be interpreted as UTC.
     To change this, chain this function with `set_timezone`.
 
@@ -453,6 +473,7 @@ def _print_all_exif_gps_info(file_path: Union[Path, str]) -> None:
 def set_timezone(
     file_paths: Union[Path, str, List[Union[Path, str]]], timezone: timedelta
 ) -> None:
+    # TODO: have this function use `timezone` as a `timezone` object instead of a `timedelta`.
     if not isinstance(file_paths, list):
         file_paths = [file_paths]
     file_paths = [_format_file_path(f) for f in file_paths]

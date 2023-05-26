@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import time, datetime, timezone, timedelta
 
 import pytest
 
@@ -8,6 +8,7 @@ from media_organizer.timeshift import (
     get_capture_datetime,
     set_capture_datetime,
     shift_capture_datetime,
+    shift_capture_datetime_to_target,
     remove_gps_info,
     capture_datetimes_are_consistent,
     extract_metadata_using_exiftool,
@@ -277,3 +278,39 @@ def test_get_timezone_from_gps_coords_vid(test_vid):
     )
     expected_timezone = timezone(timedelta(hours=+3))  # Madagascar
     assert extracted_timezone == expected_timezone
+
+
+def test_shift_capture_datetime_to_target_trivial(test_img_camera_watch):
+    """In this test, the reference and the list of images to shift are the same."""
+    # The watch indicates "21:03"
+    expected_date = datetime(2023, 5, 24, 19, 15, 14)
+    assert get_capture_datetime(test_img_camera_watch) == expected_date
+    assert capture_datetimes_are_consistent(test_img_camera_watch)
+
+    shift_capture_datetime_to_target(
+        test_img_camera_watch, reference=test_img_camera_watch, target=time(21, 3)
+    )
+    expected_date = datetime(2023, 5, 24, 21, 3, 14)
+    assert get_capture_datetime(test_img_camera_watch) == expected_date
+    assert capture_datetimes_are_consistent(test_img_camera_watch)
+
+
+def test_shift_capture_datetime_to_target_many_at_time(
+    test_img_phone, test_img_camera, test_vid, test_img_camera_watch
+):
+    # The watch indicates "21:03"
+    # The time of the image is 19:15:14
+    # This is a time delta of 1h48m46s
+
+    shift_capture_datetime_to_target(
+        [test_img_phone, test_img_camera, test_vid],
+        reference=test_img_camera_watch,
+        target=time(21, 3),
+    )
+
+    expected_date_img_phone = datetime(2023, 5, 17, 11, 18, 3)
+    expected_date_img_camera = datetime(2019, 12, 17, 13, 51, 24)
+    expected_date_vid = datetime(2022, 4, 30, 11, 21, 7)
+    assert get_capture_datetime(test_img_phone) == expected_date_img_phone
+    assert get_capture_datetime(test_img_camera) == expected_date_img_camera
+    assert get_capture_datetime(test_vid) == expected_date_vid

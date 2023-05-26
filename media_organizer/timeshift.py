@@ -2,7 +2,7 @@
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Union, List, Optional, Dict
-from datetime import datetime, timezone, timedelta
+from datetime import time, datetime, timezone, timedelta
 
 
 import pytz
@@ -606,3 +606,24 @@ class ProtectedExifAttributes(Exception):
 
 class UnknownTimezone(Exception):
     pass
+
+
+def shift_capture_datetime_to_target(
+    file_paths: Union[Path, str, List[Union[Path, str]]],
+    reference: Union[Path, str],
+    target: Union[time, datetime],
+):
+    # Calculting the datetime delta to apply.
+    ref_datetime = get_capture_datetime(reference)
+    # We need to transform `target` to a datetime object (if it's not already)
+    # For this, we give it the same day as the reference file.
+    if not isinstance(target, datetime):
+        target = datetime.combine(ref_datetime, target)
+    if target.second == 0:
+        # If the target doesn't have seconds, we add them.
+        # Otherwise, the resulting datetime will be like HH:MM:00
+        # And we want the seconds to be preserved.
+        target = target.replace(second=ref_datetime.second)
+    delta = target - ref_datetime
+
+    shift_capture_datetime(file_paths, delta)

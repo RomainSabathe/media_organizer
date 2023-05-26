@@ -613,6 +613,17 @@ def shift_capture_datetime_to_target(
     reference: Union[Path, str],
     target: Union[time, datetime],
 ):
+    """Computes the timedelta between the capture datetime of the reference file
+    and the target and applies this delta to the filepaths.
+
+    A typical scenario for using this function is the following:
+        - you take a picture of a clock with your camera (`reference`)
+        - the camera may have a slightly different time than the clock, but we assume
+          that the clock has the correct time (`target`). 
+        - you also took a bunch of pictures with your camera (`file_paths`)
+        - therefore you want to shift the capture datetime of all the pictures
+          to match the clock's time.
+    """
     # Calculting the datetime delta to apply.
     ref_datetime = get_capture_datetime(reference)
     # We need to transform `target` to a datetime object (if it's not already)

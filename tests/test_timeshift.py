@@ -314,3 +314,25 @@ def test_shift_capture_datetime_to_target_many_at_time(
     assert get_capture_datetime(test_img_phone) == expected_date_img_phone
     assert get_capture_datetime(test_img_camera) == expected_date_img_camera
     assert get_capture_datetime(test_vid) == expected_date_vid
+
+
+def test_shift_capture_datetime_to_target_many_at_time_with_day_shift(
+    test_img_phone, test_img_camera, test_vid, test_img_camera_watch
+):
+    # In this test, we assume the watch indicates 1 day _before_ the
+    # photo was taken.
+    # The photo datetime has       2023-05-24 19:15:14 as datetime.
+    # Let's assume the watch shows 2023-05-23 21:03:xx.
+
+    shift_capture_datetime_to_target(
+        [test_img_phone, test_img_camera, test_vid],
+        reference=test_img_camera_watch,
+        target=datetime(2023, 5, 23, 21, 3),
+    )
+
+    expected_date_img_phone = datetime(2023, 5, 16, 11, 18, 3)
+    expected_date_img_camera = datetime(2019, 12, 16, 13, 51, 24)
+    expected_date_vid = datetime(2022, 4, 29, 11, 21, 7)
+    assert get_capture_datetime(test_img_phone) == expected_date_img_phone
+    assert get_capture_datetime(test_img_camera) == expected_date_img_camera
+    assert get_capture_datetime(test_vid) == expected_date_vid

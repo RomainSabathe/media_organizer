@@ -1,7 +1,7 @@
 """Functions for adjusting the capture datetime of media files (photos and videos) based on a source of truth."""
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Union, List, Optional, Dict
+from typing import Union, List, Optional, Dict, Tuple
 from datetime import time, datetime, timezone, timedelta
 
 
@@ -278,7 +278,9 @@ def get_timezone(
     return timezone(diff)
 
 
-def get_capture_datetime(file_path: Union[Path, str]) -> datetime:
+def get_capture_datetime(
+    file_path: Union[Path, str], force_return_timezone: bool = False
+) -> datetime:
     metadata = extract_metadata_using_exiftool(file_path)
 
     # The presence of one key or another will depend on the nature of the file
@@ -291,7 +293,12 @@ def get_capture_datetime(file_path: Union[Path, str]) -> datetime:
 
     # Formatting and returning.
     if exif_field is not None:
-        return exif_field.parse(metadata[exif_field.name])
+        capture_datetime = exif_field.parse(metadata[exif_field.name])
+        if force_return_timezone:
+            capture_datetime = capture_datetime.replace(
+                tzinfo=get_timezone(metadata=metadata)
+            )
+        return capture_datetime
     return None  # Returns None if no capture date was found
 
 
@@ -561,6 +568,9 @@ def remove_gps_info(file_paths: Union[Path, str, List[Union[Path, str]]]):
 class GPSCoordinates:
     latitude: float
     longitude: float
+
+    def to_tuple(self) -> Tuple[float, float]:
+        return (self.latitude, self.longitude)
 
     @staticmethod
     def from_exif_metadata(metadata: Dict[str, str]) -> "GPSCoordinates":

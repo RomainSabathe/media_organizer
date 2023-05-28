@@ -27,11 +27,15 @@ def rename(file_path: Union[Path, str]) -> Path:
     capture_datetime = get_capture_datetime(file_path, force_return_timezone=True)
     new_name_parts.append(capture_datetime.isoformat())
 
-    gps_coords = GPSCoordinates.from_exif_metadata(metadata)
-    if gps_coords:
-        hits = rg.search(gps_coords.to_tuple())
-        city_name = hits[0]["name"]
-        new_name_parts.append(city_name)
+    try:
+        gps_coords = GPSCoordinates.from_exif_metadata(metadata)
+        if gps_coords:
+            hits = rg.search(gps_coords.to_tuple())
+            city_name = hits[0]["name"]
+            new_name_parts.append(city_name)
+    except ValueError:
+        # The file doesn't have GPS info.
+        pass
 
     device_name = extract_device_name_from_metadata(metadata)
     if device_name:
@@ -48,4 +52,7 @@ def extract_device_name_from_metadata(metadata: Dict[str, str]) -> str:
         parts.append(metadata["EXIF:Make"].capitalize())
     if "EXIF:Model" in metadata:
         parts.append(metadata["EXIF:Model"])
+    if any(["gopro" in key.lower() for key in metadata.keys()]):
+        parts.append("GoPro")
+
     return "_".join(parts)

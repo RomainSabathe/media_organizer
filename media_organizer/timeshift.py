@@ -610,31 +610,31 @@ class UnknownTimezone(Exception):
 
 def shift_capture_datetime_to_target(
     file_paths: Union[Path, str, List[Union[Path, str]]],
-    reference: Union[Path, str],
-    target: Union[time, datetime],
+    reference_img: Union[Path, str],
+    target_time: Union[time, datetime],
 ):
     """Computes the timedelta between the capture datetime of the reference file
     and the target and applies this delta to the filepaths.
 
     A typical scenario for using this function is the following:
-        - you take a picture of a clock with your camera (`reference`)
+        - you take a picture of a clock with your camera (`reference_img`)
         - the camera may have a slightly different time than the clock, but we assume
-          that the clock has the correct time (`target`). 
+          that the clock has the correct time (`target_time`).
         - you also took a bunch of pictures with your camera (`file_paths`)
         - therefore you want to shift the capture datetime of all the pictures
           to match the clock's time.
     """
     # Calculting the datetime delta to apply.
-    ref_datetime = get_capture_datetime(reference)
-    # We need to transform `target` to a datetime object (if it's not already)
+    ref_datetime = get_capture_datetime(reference_img)
+    # We need to transform `target_time` to a datetime object (if it's not already)
     # For this, we give it the same day as the reference file.
-    if not isinstance(target, datetime):
-        target = datetime.combine(ref_datetime, target)
-    if target.second == 0:
-        # If the target doesn't have seconds, we add them.
+    if not isinstance(target_time, datetime):
+        target_time = datetime.combine(ref_datetime, target_time)
+    if target_time.second == 0:
+        # If the target_time doesn't have seconds, we add them.
         # Otherwise, the resulting datetime will be like HH:MM:00
         # And we want the seconds to be preserved.
-        target = target.replace(second=ref_datetime.second)
-    delta = target - ref_datetime
+        target_time = target_time.replace(second=ref_datetime.second)
+    delta = target_time - ref_datetime
 
     shift_capture_datetime(file_paths, delta)

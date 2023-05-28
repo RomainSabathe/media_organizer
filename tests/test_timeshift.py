@@ -288,7 +288,9 @@ def test_shift_capture_datetime_to_target_trivial(test_img_camera_watch):
     assert capture_datetimes_are_consistent(test_img_camera_watch)
 
     shift_capture_datetime_to_target(
-        test_img_camera_watch, reference=test_img_camera_watch, target=time(21, 3)
+        test_img_camera_watch,
+        reference_img=test_img_camera_watch,
+        target_time=time(21, 3),
     )
     expected_date = datetime(2023, 5, 24, 21, 3, 14)
     assert get_capture_datetime(test_img_camera_watch) == expected_date
@@ -304,8 +306,8 @@ def test_shift_capture_datetime_to_target_many_at_time(
 
     shift_capture_datetime_to_target(
         [test_img_phone, test_img_camera, test_vid],
-        reference=test_img_camera_watch,
-        target=time(21, 3),
+        reference_img=test_img_camera_watch,
+        target_time=time(21, 3),
     )
 
     expected_date_img_phone = datetime(2023, 5, 17, 11, 18, 3)
@@ -326,8 +328,8 @@ def test_shift_capture_datetime_to_target_many_at_time_with_day_shift(
 
     shift_capture_datetime_to_target(
         [test_img_phone, test_img_camera, test_vid],
-        reference=test_img_camera_watch,
-        target=datetime(2023, 5, 23, 21, 3),
+        reference_img=test_img_camera_watch,
+        target_time=datetime(2023, 5, 23, 21, 3),
     )
 
     expected_date_img_phone = datetime(2023, 5, 16, 11, 18, 3)

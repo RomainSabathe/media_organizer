@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Optional
 
 import reverse_geocoder as rg
 
@@ -25,6 +25,13 @@ def rename(file_paths: Union[Path, str, List[Union[Path, str]]]) -> Path:
 
     metadatas = extract_metadata_using_exiftool(file_paths)
     capture_datetimes = get_capture_datetime(file_paths, force_return_timezone=True)
+
+    gps_coords = GPSCoordinates.from_exif_metadata(metadatas)
+    city_names = gps_coords_to_city_name(gps_coords)
+    import ipdb
+
+    ipdb.set_trace()
+
     new_name_parts.append(capture_datetime.isoformat())
 
     try:
@@ -43,6 +50,24 @@ def rename(file_paths: Union[Path, str, List[Union[Path, str]]]) -> Path:
 
     new_name = "-".join(new_name_parts)
     return Path(new_name).with_suffix(file_path.suffix)
+
+
+@handle_single_or_list()
+def gps_coords_to_city_name(gps_coords: List[GPSCoordinates]) -> List[Union[str, None]]:
+    """Get the city name from the GPS coordinates."""
+    # reverse_geocoding is expecting all non-None GPSCoordinates.
+    # But gps_coords is a list that might contain None values.
+    # We need to pre-filter and keep track of the original indexes.
+
+    non_null_indices = [i for i, x in enumerate(gps_coords) if x is not None]
+    non_null_gps_coords = [x.to_tuple() for x in gps_coords if x is not None]
+
+    city_names = [None] * len(gps_coords)
+    hits = rg.search(non_null_gps_coords)
+    for index, hit in zip(non_null_indices, hits):
+        city_names[index] = hit["name"]
+
+    return city_names
 
 
 def extract_device_name_from_metadata(metadata: Dict[str, str]) -> str:

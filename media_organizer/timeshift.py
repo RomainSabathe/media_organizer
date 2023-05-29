@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from typing import Union, List, Optional, Dict, Tuple
 from datetime import time, datetime, timezone, timedelta
 
-
 import pytz
 import exiftool
 from timezonefinder import TimezoneFinder
+
+from media_organizer.utils import handle_file_path_as_singleton_or_list
 
 
 @dataclass(frozen=True)
@@ -155,11 +156,10 @@ GPS_FIELDS = [
 ]
 
 
+@handle_file_path_as_singleton_or_list
 def extract_metadata_using_exiftool(
     file_paths: Union[Path, str, List[Union[Path, str]]]
 ) -> dict:
-    file_paths = _format_file_paths(file_paths)
-
     with exiftool.ExifTool() as et:
         file_paths_as_str = [str(file_path) for file_path in file_paths]
 
@@ -282,9 +282,10 @@ def get_timezone(
 
 
 def get_capture_datetime(
-    file_path: Union[Path, str], force_return_timezone: bool = False
+    file_paths: Union[Path, str, List[Union[Path, str]]],
+    force_return_timezone: bool = False,
 ) -> datetime:
-    metadata = extract_metadata_using_exiftool(file_path)
+    metadata = extract_metadata_using_exiftool(file_paths)
 
     # The presence of one key or another will depend on the nature of the file
     # (photo, video, encoder, etc.) so we greedily find the first one that exists.
@@ -366,6 +367,7 @@ def capture_datetimes_are_consistent(
     return True
 
 
+@handle_file_path_as_singleton_or_list
 def set_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]], new_datetime: datetime
 ) -> None:
@@ -378,8 +380,6 @@ def set_capture_datetime(
         file_paths: The file(s) to modify.
         new_datetime: The new datetime to set.
     """
-    file_paths = _format_file_paths(file_paths)
-
     exiftool_cmd = []
     for field in DATETIME_FIELDS:
         new_datetime_str = field.unparse(new_datetime)
@@ -389,6 +389,7 @@ def set_capture_datetime(
         et.execute(*exiftool_cmd)
 
 
+@handle_file_path_as_singleton_or_list
 def shift_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     datetime_shift: timedelta,
@@ -401,8 +402,6 @@ def shift_capture_datetime(
         file_paths: The file(s) whose capture datetime will be shifted.
         datetime_shift: The timedelta by which the capture datetime will be shifted.
     """
-    file_paths = _format_file_paths(file_paths)
-
     exiftool_cmd = []
     # Important note: we *don't* use the "-AllDates+=..." option because it
     # doesn't update some fields (e.g. QuickTime:MediaCreateDate).
@@ -444,22 +443,6 @@ def shift_capture_datetime(
         et.execute(*exiftool_cmd)
 
 
-def _format_file_paths(
-    file_paths: Union[Path, str, List[Union[Path, str]]]
-) -> List[Path]:
-    if not isinstance(file_paths, list):
-        file_paths = [file_paths]
-
-    to_return = []
-    for file_path in file_paths:
-        file_path = Path(file_path)
-        if not file_path.exists():
-            # ExifTool will raise an error if the file doesn't exist, but this is a more specific error message.
-            raise FileNotFoundError(f"File not found: {file_path}")
-        to_return.append(file_path)
-    return file_paths
-
-
 def _nullify_microseconds(dt: datetime) -> datetime:
     return dt.replace(microsecond=0)
 
@@ -484,12 +467,11 @@ def _print_all_exif_gps_info(file_path: Union[Path, str]) -> None:
             print(f"{field}: {metadata[field]}")
 
 
+@handle_file_path_as_singleton_or_list
 def set_timezone(
     file_paths: Union[Path, str, List[Union[Path, str]]], timezone: timedelta
 ) -> None:
     # TODO: have this function use `timezone` as a `timezone` object instead of a `timedelta`.
-    file_paths = _format_file_paths(file_paths)
-
     # We need to convert the timezone into "+HH:MM" or "-HH:MM" format.
     # This format will be used by ExifTool.
     hours, remainder = divmod(abs(timezone.total_seconds()), 3600)
@@ -533,6 +515,7 @@ def set_timezone(
         et.execute(*exiftool_cmd)
 
 
+@handle_file_path_as_singleton_or_list
 def remove_gps_info(file_paths: Union[Path, str, List[Union[Path, str]]]):
     """Removes all GPS-related EXIF fields from a file.
 
@@ -540,8 +523,6 @@ def remove_gps_info(file_paths: Union[Path, str, List[Union[Path, str]]]):
     Embedded GPS can arise for instance in GoPro videos. Those can't be
     deleted from the file using ExifTool.
     """
-    file_paths = _format_file_paths(file_paths)
-
     # First we read what GPS fields are available to understand if all of them
     # can be removed.
     # TODO: expand the extract_metadata_using_exiftool function to return

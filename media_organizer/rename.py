@@ -3,15 +3,16 @@ from typing import List, Union, Dict
 
 import reverse_geocoder as rg
 
+from media_organizer.utils import handle_file_path_as_singleton_or_list
 from media_organizer.timeshift import (
     extract_metadata_using_exiftool,
     get_capture_datetime,
     GPSCoordinates,
     get_timezone,
-    _format_file_paths,
 )
 
 
+@handle_file_path_as_singleton_or_list
 def rename(file_paths: Union[Path, str, List[Union[Path, str]]]) -> Path:
     """Rename a file or a list of files with the following format:
     <date>-<city>-<device>.<extension>
@@ -20,11 +21,10 @@ def rename(file_paths: Union[Path, str, List[Union[Path, str]]]) -> Path:
     <device> is the device used to capture the file.
     <extension> is the file extension.
     """
-    file_paths = _format_file_paths(file_paths)
     new_name_parts = []
 
     metadatas = extract_metadata_using_exiftool(file_paths)
-    capture_datetime = get_capture_datetime(file_path, force_return_timezone=True)
+    capture_datetimes = get_capture_datetime(file_paths, force_return_timezone=True)
     new_name_parts.append(capture_datetime.isoformat())
 
     try:

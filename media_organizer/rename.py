@@ -8,11 +8,11 @@ from media_organizer.timeshift import (
     get_capture_datetime,
     GPSCoordinates,
     get_timezone,
-    _format_file_path,
+    _format_file_paths,
 )
 
 
-def rename(file_path: Union[Path, str]) -> Path:
+def rename(file_paths: Union[Path, str, List[Union[Path, str]]]) -> Path:
     """Rename a file or a list of files with the following format:
     <date>-<city>-<device>.<extension>
     <date> is the capture datetime of the file in ISO 8601 format.
@@ -20,10 +20,10 @@ def rename(file_path: Union[Path, str]) -> Path:
     <device> is the device used to capture the file.
     <extension> is the file extension.
     """
-    file_path = _format_file_path(file_path)
+    file_paths = _format_file_paths(file_paths)
     new_name_parts = []
 
-    metadata = extract_metadata_using_exiftool(file_path)
+    metadatas = extract_metadata_using_exiftool(file_paths)
     capture_datetime = get_capture_datetime(file_path, force_return_timezone=True)
     new_name_parts.append(capture_datetime.isoformat())
 

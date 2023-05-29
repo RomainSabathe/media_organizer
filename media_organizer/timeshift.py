@@ -155,19 +155,22 @@ GPS_FIELDS = [
 ]
 
 
-def extract_metadata_using_exiftool(file_path: Union[Path, str]) -> dict:
-    file_path = _format_file_path(file_path)
+def extract_metadata_using_exiftool(
+    file_paths: Union[Path, str, List[Union[Path, str]]]
+) -> dict:
+    file_paths = _format_file_paths(file_paths)
 
     with exiftool.ExifTool() as et:
-        metadata = et.execute_json(
-            *["-ee", str(file_path)]
-        )  # -ee = ExtractEmbedded. Allows to extract metadata from embedded files (e.g. XMP in JPEG)
-        if len(metadata) == 0:
-            raise ValueError(f"No metadata found for {file_path}")
-        if len(metadata) > 1:
-            raise ValueError(f"Found multiple sources of metadata for {file_path}")
-        metadata = metadata[0]
-    return metadata
+        file_paths_as_str = [str(file_path) for file_path in file_paths]
+
+        # -ee = ExtractEmbedded. Allows to extract metadata from embedded files (e.g. XMP in JPEG)
+        exiftool_args = ["-ee", *file_paths_as_str]
+        metadatas = et.execute_json(*exiftool_args)
+        if len(metadatas) != len(file_paths):
+            raise ValueError(
+                f"Expected {len(file_paths)} metadata, got {len(metadata)}"
+            )
+    return metadatas
 
 
 def get_timezone(
@@ -375,9 +378,7 @@ def set_capture_datetime(
         file_paths: The file(s) to modify.
         new_datetime: The new datetime to set.
     """
-    if not isinstance(file_paths, list):
-        file_paths = [file_paths]
-    file_paths = [_format_file_path(f) for f in file_paths]
+    file_paths = _format_file_paths(file_paths)
 
     exiftool_cmd = []
     for field in DATETIME_FIELDS:
@@ -400,9 +401,7 @@ def shift_capture_datetime(
         file_paths: The file(s) whose capture datetime will be shifted.
         datetime_shift: The timedelta by which the capture datetime will be shifted.
     """
-    if not isinstance(file_paths, list):
-        file_paths = [file_paths]
-    file_paths = [_format_file_path(f) for f in file_paths]
+    file_paths = _format_file_paths(file_paths)
 
     exiftool_cmd = []
     # Important note: we *don't* use the "-AllDates+=..." option because it
@@ -445,12 +444,20 @@ def shift_capture_datetime(
         et.execute(*exiftool_cmd)
 
 
-def _format_file_path(file_path: Union[Path, str]) -> Path:
-    file_path = Path(file_path)
-    if not file_path.exists():
-        # ExifTool will raise an error if the file doesn't exist, but this is a more specific error message.
-        raise FileNotFoundError(f"File not found: {file_path}")
-    return file_path
+def _format_file_paths(
+    file_paths: Union[Path, str, List[Union[Path, str]]]
+) -> List[Path]:
+    if not isinstance(file_paths, list):
+        file_paths = [file_paths]
+
+    to_return = []
+    for file_path in file_paths:
+        file_path = Path(file_path)
+        if not file_path.exists():
+            # ExifTool will raise an error if the file doesn't exist, but this is a more specific error message.
+            raise FileNotFoundError(f"File not found: {file_path}")
+        to_return.append(file_path)
+    return file_paths
 
 
 def _nullify_microseconds(dt: datetime) -> datetime:
@@ -481,9 +488,7 @@ def set_timezone(
     file_paths: Union[Path, str, List[Union[Path, str]]], timezone: timedelta
 ) -> None:
     # TODO: have this function use `timezone` as a `timezone` object instead of a `timedelta`.
-    if not isinstance(file_paths, list):
-        file_paths = [file_paths]
-    file_paths = [_format_file_path(f) for f in file_paths]
+    file_paths = _format_file_paths(file_paths)
 
     # We need to convert the timezone into "+HH:MM" or "-HH:MM" format.
     # This format will be used by ExifTool.
@@ -535,9 +540,7 @@ def remove_gps_info(file_paths: Union[Path, str, List[Union[Path, str]]]):
     Embedded GPS can arise for instance in GoPro videos. Those can't be
     deleted from the file using ExifTool.
     """
-    if not isinstance(file_paths, list):
-        file_paths = [file_paths]
-    file_paths = [_format_file_path(f) for f in file_paths]
+    file_paths = _format_file_paths(file_paths)
 
     # First we read what GPS fields are available to understand if all of them
     # can be removed.

@@ -2,6 +2,7 @@ from datetime import time, datetime, timezone, timedelta
 
 import pytest
 
+from media_organizer.rename import extract_device_name_from_metadata
 from media_organizer.timeshift import (
     set_timezone,
     get_timezone,
@@ -18,6 +19,17 @@ from media_organizer.timeshift import (
     GPSCoordinates,
     ProtectedExifAttributes,
 )
+
+
+def test_extract_metadata_multiple_files(test_img_phone, test_img_camera):
+    metadatas = extract_metadata_using_exiftool([test_img_phone, test_img_camera])
+    assert len(metadatas) == 2
+
+    phone_name = extract_device_name_from_metadata(metadatas[0])
+    assert phone_name == "Huawei_VOG-L09"
+
+    camera_name = extract_device_name_from_metadata(metadatas[1])
+    assert camera_name == "Fujifilm_X-T20"
 
 
 def test_get_capture_datetime_photo_phone(test_img_phone):

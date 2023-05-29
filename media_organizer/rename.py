@@ -13,7 +13,7 @@ from media_organizer.timeshift import (
 
 
 @handle_single_or_list(is_file_path=True)
-def rename(file_paths: Union[Path, str, List[Union[Path, str]]]) -> Path:
+def rename(file_paths: Union[Path, str, List[Union[Path, str]]]) -> List[Path]:
     """Rename a file or a list of files with the following format:
     <date>-<city>-<device>.<extension>
     <date> is the capture datetime of the file in ISO 8601 format.
@@ -21,35 +21,34 @@ def rename(file_paths: Union[Path, str, List[Union[Path, str]]]) -> Path:
     <device> is the device used to capture the file.
     <extension> is the file extension.
     """
-    new_name_parts = []
-
+    # Part 1: capture datetime.
     metadatas = extract_metadata_using_exiftool(file_paths)
     capture_datetimes = get_capture_datetime(file_paths, force_return_timezone=True)
+    if not isinstance(capture_datetimes, list):
+        capture_datetimes = [capture_datetimes]
 
+    # Part 2: city name
     gps_coords = GPSCoordinates.from_exif_metadata(metadatas)
     city_names = gps_coords_to_city_name(gps_coords)
-    import ipdb
+    if not isinstance(city_names, list):
+        city_names = [city_names]
 
-    ipdb.set_trace()
+    # Part 3: device name
+    device_names = extract_device_name_from_metadata(metadatas)
+    if not isinstance(device_names, list):
+        device_names = [device_names]
 
-    new_name_parts.append(capture_datetime.isoformat())
+    # Now putting it all together
+    new_names = []
+    iterator = zip(file_paths, capture_datetimes, city_names, device_names)
+    for file_path, *info_triplet in iterator:
+        info_triplet = [part for part in info_triplet if part is not None]
+        # The first element should always be there: it's the capture datetime.
+        info_triplet[0] = info_triplet[0].isoformat()
+        new_name = Path("-".join(info_triplet)).with_suffix(file_path.suffix)
+        new_names.append(new_name)
 
-    try:
-        gps_coords = GPSCoordinates.from_exif_metadata(metadata)
-        if gps_coords:
-            hits = rg.search(gps_coords.to_tuple())
-            city_name = hits[0]["name"]
-            new_name_parts.append(city_name)
-    except ValueError:
-        # The file doesn't have GPS info.
-        pass
-
-    device_name = extract_device_name_from_metadata(metadata)
-    if device_name:
-        new_name_parts.append(device_name)
-
-    new_name = "-".join(new_name_parts)
-    return Path(new_name).with_suffix(file_path.suffix)
+    return new_names
 
 
 @handle_single_or_list()
@@ -61,6 +60,8 @@ def gps_coords_to_city_name(gps_coords: List[GPSCoordinates]) -> List[Union[str,
 
     non_null_indices = [i for i, x in enumerate(gps_coords) if x is not None]
     non_null_gps_coords = [x.to_tuple() for x in gps_coords if x is not None]
+    if len(non_null_gps_coords) == 0:
+        return [None] * len(gps_coords)
 
     city_names = [None] * len(gps_coords)
     hits = rg.search(non_null_gps_coords)
@@ -70,6 +71,7 @@ def gps_coords_to_city_name(gps_coords: List[GPSCoordinates]) -> List[Union[str,
     return city_names
 
 
+@handle_single_or_list(is_embarrassingly_parallel=True)
 def extract_device_name_from_metadata(metadata: Dict[str, str]) -> str:
     """Extract the device name from the metadata of a file."""
     parts = []

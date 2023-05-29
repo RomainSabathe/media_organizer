@@ -24,8 +24,12 @@ def handle_single_or_list(is_file_path=False, is_embarrassingly_parallel=False):
 
             if result is None:
                 return None
-            if len(result) == 1:
-                return result[0]
+            if isinstance(result, list):
+                if len(result) == 1:
+                    return result[0]
+            if isinstance(result, dict):
+                if len(result) == 1:
+                    return list(result.values())[0]
             return result
 
         return wrapper

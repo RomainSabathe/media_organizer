@@ -53,6 +53,17 @@ def test_get_capture_datetime_video(test_vid):
     assert capture_datetimes_are_consistent(test_vid)
 
 
+def test_get_capture_datetime_batch(test_img_phone, test_img_camera, test_vid):
+    capture_datetimes = get_capture_datetime(
+        [test_img_phone, test_img_camera, test_vid]
+    )
+    assert capture_datetimes == [
+        datetime(2023, 5, 17, 9, 30, 3),
+        datetime(2019, 12, 17, 12, 3, 24),
+        datetime(2022, 4, 30, 9, 33, 7),
+    ]
+
+
 def test_set_capture_datetime_one_at_a_time(test_media_file):
     old_date = get_capture_datetime(test_media_file)
     new_date = datetime(2023, 5, 20, 15, 20, 33)

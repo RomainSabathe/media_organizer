@@ -8,7 +8,7 @@ import pytz
 import exiftool
 from timezonefinder import TimezoneFinder
 
-from media_organizer.utils import handle_file_path_as_singleton_or_list
+from media_organizer.utils import handle_single_or_list
 
 
 @dataclass(frozen=True)
@@ -156,7 +156,7 @@ GPS_FIELDS = [
 ]
 
 
-@handle_file_path_as_singleton_or_list
+@handle_single_or_list(is_file_path=True)
 def extract_metadata_using_exiftool(
     file_paths: Union[Path, str, List[Union[Path, str]]]
 ) -> dict:
@@ -281,13 +281,31 @@ def get_timezone(
     return timezone(diff)
 
 
+@handle_single_or_list(is_file_path=True)
 def get_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     force_return_timezone: bool = False,
-) -> datetime:
-    metadata = extract_metadata_using_exiftool(file_paths)
+) -> Union[datetime, List[datetime], None, List[None]]:
+    metadatas = extract_metadata_using_exiftool(file_paths)
+    if not isinstance(metadatas, list):
+        metadatas = [metadatas]
 
-    # The presence of one key or another will depend on the nature of the file
+    # Embarrassingly parallel. But this is fast given that it's just
+    # dictionary lookups.
+    return [
+        _get_capture_datetime_from_metadata(metadata, force_return_timezone)
+        for metadata in metadatas
+    ]
+
+
+def _get_capture_datetime_from_metadata(
+    metadata: Dict[str, str], force_return_timezone: bool = False
+) -> Union[datetime, None]:
+    """Get the capture datetime from a metadata dictionary.
+    This function is used internally by get_capture_datetime.
+    It will work on a single metadata dictionary (i.e. a single file) whereas
+    get_capture_datetime works on a list of files directly.
+    """
     # (photo, video, encoder, etc.) so we greedily find the first one that exists.
     exif_field = None  # The Exif field that will be used to get the datetime.
     for field in DATETIME_FIELDS:
@@ -367,7 +385,7 @@ def capture_datetimes_are_consistent(
     return True
 
 
-@handle_file_path_as_singleton_or_list
+@handle_single_or_list(is_file_path=True)
 def set_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]], new_datetime: datetime
 ) -> None:
@@ -389,7 +407,7 @@ def set_capture_datetime(
         et.execute(*exiftool_cmd)
 
 
-@handle_file_path_as_singleton_or_list
+@handle_single_or_list(is_file_path=True)
 def shift_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     datetime_shift: timedelta,
@@ -467,7 +485,7 @@ def _print_all_exif_gps_info(file_path: Union[Path, str]) -> None:
             print(f"{field}: {metadata[field]}")
 
 
-@handle_file_path_as_singleton_or_list
+@handle_single_or_list(is_file_path=True)
 def set_timezone(
     file_paths: Union[Path, str, List[Union[Path, str]]], timezone: timedelta
 ) -> None:
@@ -515,7 +533,7 @@ def set_timezone(
         et.execute(*exiftool_cmd)
 
 
-@handle_file_path_as_singleton_or_list
+@handle_single_or_list(is_file_path=True)
 def remove_gps_info(file_paths: Union[Path, str, List[Union[Path, str]]]):
     """Removes all GPS-related EXIF fields from a file.
 

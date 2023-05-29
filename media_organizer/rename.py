@@ -3,7 +3,7 @@ from typing import List, Union, Dict
 
 import reverse_geocoder as rg
 
-from media_organizer.utils import handle_file_path_as_singleton_or_list
+from media_organizer.utils import handle_single_or_list
 from media_organizer.timeshift import (
     extract_metadata_using_exiftool,
     get_capture_datetime,
@@ -12,7 +12,7 @@ from media_organizer.timeshift import (
 )
 
 
-@handle_file_path_as_singleton_or_list
+@handle_single_or_list(is_file_path=True)
 def rename(file_paths: Union[Path, str, List[Union[Path, str]]]) -> Path:
     """Rename a file or a list of files with the following format:
     <date>-<city>-<device>.<extension>

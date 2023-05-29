@@ -290,8 +290,13 @@ def test_get_timezone_from_gps_coords_img_camera(test_img_camera):
     with pytest.raises(ValueError):
         # We have no GPS info on most camera files.
         extracted_timezone = gps_coords_to_timezone(
-            GPSCoordinates.from_exif_metadata(metadata)
+            GPSCoordinates.from_exif_metadata(metadata, errors="raise")
         )
+
+    extracted_timezone = gps_coords_to_timezone(
+        GPSCoordinates.from_exif_metadata(metadata, errors="ignore")
+    )
+    assert extracted_timezone is None
 
 
 def test_get_timezone_from_gps_coords_vid(test_vid):
@@ -300,7 +305,18 @@ def test_get_timezone_from_gps_coords_vid(test_vid):
         GPSCoordinates.from_exif_metadata(metadata)
     )
     expected_timezone = timezone(timedelta(hours=+3))  # Madagascar
-    assert extracted_timezone == expected_timezone
+
+
+def test_get_timezone_from_gps_coords_batch(test_img_phone, test_img_camera, test_vid):
+    metadatas = extract_metadata_using_exiftool(
+        [test_img_phone, test_img_camera, test_vid]
+    )
+    gps_coords = GPSCoordinates.from_exif_metadata(metadatas)
+    extracted_timezones = gps_coords_to_timezone(gps_coords)
+
+    assert extracted_timezones[0] == timezone(timedelta(hours=2))
+    assert extracted_timezones[1] is None
+    assert extracted_timezones[2] == timezone(timedelta(hours=+3))
 
 
 def test_shift_capture_datetime_to_target_trivial(test_img_camera_watch):

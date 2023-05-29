@@ -214,7 +214,7 @@ def get_timezone(
     # (GooglePhotos does this)
     if based_on_gps:
         try:
-            gps_coords = GPSCoordinates.from_exif_metadata(metadata)
+            gps_coords = GPSCoordinates.from_exif_metadata(metadata, errors="raise")
             return gps_coords_to_timezone(gps_coords)
         except ValueError:
             # Is raised when there is no GPS information in the file.
@@ -575,7 +575,10 @@ class GPSCoordinates:
         return (self.latitude, self.longitude)
 
     @staticmethod
-    def from_exif_metadata(metadata: Dict[str, str]) -> "GPSCoordinates":
+    @handle_single_or_list(is_embarrassingly_parallel=True)
+    def from_exif_metadata(
+        metadata: Dict[str, str], errors: str = "ignore"
+    ) -> "GPSCoordinates":
         latitude, longitude = None, None
         for field in GPS_FIELDS:
             if field.name not in metadata:
@@ -586,12 +589,18 @@ class GPSCoordinates:
                 longitude = metadata.get(field.name)
 
         if latitude is None or longitude is None:
+            if errors == "ignore":
+                return None
             raise ValueError("Metadata does not contain GPS information")
 
         return GPSCoordinates(latitude, longitude)
 
 
+@handle_single_or_list(is_embarrassingly_parallel=True)
 def gps_coords_to_timezone(coords: GPSCoordinates) -> datetime:
+    if coords is None:
+        return None
+
     tf = TimezoneFinder()
     timezone_str = tf.timezone_at(lng=coords.longitude, lat=coords.latitude)
     if timezone_str is None:

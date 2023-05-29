@@ -4,7 +4,7 @@ from pathlib import Path
 from pathlib import Path
 
 
-def handle_single_or_list(is_file_path=False):
+def handle_single_or_list(is_file_path=False, is_embarrassingly_parallel=False):
     def actual_decorator(func):
         def wrapper(obj_or_list, *args, **kwargs):
             if not isinstance(obj_or_list, list):
@@ -17,7 +17,11 @@ def handle_single_or_list(is_file_path=False):
                         # ExifTool will raise an error if the file doesn't exist, but this is a more specific error message.
                         raise FileNotFoundError(f"File not found: {file_path}")
 
-            result = func(obj_or_list, *args, **kwargs)
+            if is_embarrassingly_parallel:
+                result = [func(obj, *args, **kwargs) for obj in obj_or_list]
+            else:
+                result = func(obj_or_list, *args, **kwargs)
+
             if result is None:
                 return None
             if len(result) == 1:

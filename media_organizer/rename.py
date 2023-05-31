@@ -13,8 +13,11 @@ from media_organizer.timeshift import (
 
 
 @handle_single_or_list(is_file_path=True)
-def rename(file_paths: Union[Path, str, List[Union[Path, str]]]) -> List[Path]:
-    """Rename a file or a list of files with the following format:
+def get_rename_plan(
+    file_paths: Union[Path, str, List[Union[Path, str]]]
+) -> Dict[Path, Path]:
+    """Return a dictionary of file paths to their new file paths.
+    The new file paths are generated using the following format:
     <date>-<city>-<device>.<extension>
     <date> is the capture datetime of the file in ISO 8601 format.
     <city> is the city where the file was captured (if GPS info is available).
@@ -39,14 +42,14 @@ def rename(file_paths: Union[Path, str, List[Union[Path, str]]]) -> List[Path]:
         device_names = [device_names]
 
     # Now putting it all together
-    new_names = []
+    new_names = {}
     iterator = zip(file_paths, capture_datetimes, city_names, device_names)
     for file_path, *info_triplet in iterator:
         info_triplet = [part for part in info_triplet if part is not None]
         # The first element should always be there: it's the capture datetime.
         info_triplet[0] = info_triplet[0].isoformat()
         new_name = Path("-".join(info_triplet)).with_suffix(file_path.suffix)
-        new_names.append(new_name)
+        new_names[file_path] = new_name
 
     return new_names
 
@@ -83,3 +86,7 @@ def extract_device_name_from_metadata(metadata: Dict[str, str]) -> str:
         parts.append("GoPro")
 
     return "_".join(parts)
+
+
+def rename():
+    pass

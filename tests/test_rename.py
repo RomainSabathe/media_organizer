@@ -44,9 +44,9 @@ def test_get_rename_plan_batch(test_img_phone, test_img_camera, test_vid):
         "2023-05-17_09-30-03_p0200-Zonza-Huawei_VOG-L09.jpg"
     )
     assert rename_plan[test_img_camera] == Path(
-        "2019-12-17-12-03-24_p0200-Fujifilm_X-T20.jpg"
+        "2019-12-17_12-03-24_p0200-Fujifilm_X-T20.jpg"
     )
-    assert rename_plan[test_vid] == Path("2022-04-30-09-33-07_p0300-Toliara-GoPro.mp4")
+    assert rename_plan[test_vid] == Path("2022-04-30_09-33-07_p0300-Toliara-GoPro.mp4")
 
 
 def test_rename_one_file_no_backup(test_img_phone):
@@ -64,7 +64,7 @@ def test_rename_one_file_no_backup_custom_output_dir(test_img_phone, another_tmp
 
     assert new_path.exists()
     assert not test_img_phone.exists()
-    assert not (Path("new_name.jpg.backup")).exists()
+    assert test_img_phone.with_suffix(test_img_phone.suffix + ".backup").exists()
 
 
 def test_rename_one_file_with_backup(test_img_phone):
@@ -83,6 +83,43 @@ def test_batch_rename_singleton_no_backup_no_output_dir(test_img_phone):
     assert new_path.parent == test_img_phone.parent
     assert new_path.exists()
     assert not test_img_phone.exists()
+
+
+def test_batch_rename_singleton_no_backup_with_output_dir(
+    test_img_phone, another_tmp_path
+):
+    new_path = rename(test_img_phone, output_dir=another_tmp_path, create_backups=False)
+
+    assert new_path.name == "2023-05-17_09-30-03_p0200-Zonza-Huawei_VOG-L09.jpg"
+    assert new_path.parent == another_tmp_path
+    assert new_path.exists()
+    assert not test_img_phone.exists()
+
+
+def test_batch_rename_singleton_with_backup_with_output_dir(
+    test_img_phone, another_tmp_path
+):
+    new_path = rename(test_img_phone, output_dir=another_tmp_path, create_backups=True)
+
+    assert new_path.name == "2023-05-17_09-30-03_p0200-Zonza-Huawei_VOG-L09.jpg"
+    assert new_path.parent == another_tmp_path
+    assert new_path.exists()
+    assert not test_img_phone.exists()
+    assert test_img_phone.with_suffix(test_img_phone.suffix + ".backup").exists()
+
+
+def test_batch_rename(test_img_phone, test_img_camera, test_vid, another_tmp_path):
+    rename_plan = rename(
+        [test_img_phone, test_img_camera, test_vid],
+        output_dir=another_tmp_path,
+        create_backups=True,
+    )
+
+    for old_path, new_path in rename_plan.items():
+        assert new_path.exists()
+        assert new_path.parent == another_tmp_path
+        assert not old_path.exists()
+        assert old_path.with_suffix(old_path.suffix + ".backup").exists()
 
 
 def test_get_rename_plan_when_two_files_have_the_same_datetime():

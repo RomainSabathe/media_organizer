@@ -78,3 +78,9 @@ def test_img(request):
     """Fixture to iterate over all test images."""
     media_file = request.getfixturevalue(request.param)
     return media_file
+
+
+# New fixture for creating an additional temporary directory
+@pytest.fixture
+def another_tmp_path(tmp_path_factory):
+    return tmp_path_factory.mktemp("another_tmp_dir")

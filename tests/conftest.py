@@ -30,6 +30,17 @@ def test_img_camera(tmp_path):
 
 
 @pytest.fixture
+def test_vid_camera(tmp_path):
+    file_path = THIS_DIR / "data" / "test_vid_camera.mov"
+
+    # Creating a copy of the file so that we don't modify the original file.
+    temp_file_path = tmp_path / file_path.name
+    shutil.copy2(file_path, temp_file_path)
+
+    yield temp_file_path
+
+
+@pytest.fixture
 def test_img_camera_watch(tmp_path):
     file_path = THIS_DIR / "data" / "test_img_camera_watch.jpg"
 

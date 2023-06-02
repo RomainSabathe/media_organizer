@@ -33,21 +33,32 @@ def test_extract_metadata_multiple_files(test_img_phone, test_img_camera):
 
 
 def test_get_capture_datetime_photo_phone(test_img_phone):
-    # TODO: add other `test_img_phone` coming from different cameras (1 phone, 1 GoPro, 1 Fuji)
     expected_date = datetime(2023, 5, 17, 9, 30, 3)
     assert get_capture_datetime(test_img_phone) == expected_date
     assert capture_datetimes_are_consistent(test_img_phone)
 
 
+def test_get_capture_datetime_vid_phone():
+    assert False
+
+
 def test_get_capture_datetime_photo_camera(test_img_camera):
-    # TODO: add other `test_img_phone` coming from different cameras (1 phone, 1 GoPro, 1 Fuji)
     expected_date = datetime(2019, 12, 17, 12, 3, 24)
     assert get_capture_datetime(test_img_camera) == expected_date
     assert capture_datetimes_are_consistent(test_img_camera)
 
 
+def test_get_capture_datetime_video_camera(test_vid_camera):
+    expected_date = datetime(2023, 6, 2, 22, 35, 12)
+    assert get_capture_datetime(test_vid_camera) == expected_date
+    # For some reason, the QuickTime tags are 26 seconds ahead the
+    # EXIF: tags.
+    # This test will fail at this stage.
+    # TODO: investigate.
+    assert capture_datetimes_are_consistent(test_vid_camera)
+
+
 def test_get_capture_datetime_video(test_vid):
-    # TODO: add other `test_video` coming from different cameras (1 phone, 1 GoPro, 1 Fuji)
     expected_date = datetime(2022, 4, 30, 9, 33, 7)
     assert get_capture_datetime(test_vid) == expected_date
     assert capture_datetimes_are_consistent(test_vid)
@@ -114,6 +125,17 @@ def test_shift_capture_datetime_photo_camera(test_img_camera):
     assert capture_datetimes_are_consistent(test_img_camera)
 
 
+def test_shift_capture_datetime_video_camera(test_vid_camera):
+    # From a previous test, we know that the original date  is 2023-06-02 22:35:12.
+    datetime_shift = timedelta(hours=-2, minutes=47, seconds=13)
+    expected_date = datetime(2023, 6, 2, 21, 22, 25)
+
+    shift_capture_datetime(test_vid_camera, datetime_shift)
+    assert get_capture_datetime(test_vid_camera) == expected_date
+    # TODO: this will fail.
+    assert capture_datetimes_are_consistent(test_vid_camera)
+
+
 def test_shift_capture_datetime_photo_phone_positive_shift(test_img_phone):
     # From a previous test, we know that the original date is 2023-05-17 09:30:03.
     datetime_shift = timedelta(hours=3, minutes=-5, seconds=13)
@@ -132,6 +154,17 @@ def test_shift_capture_datetime_photo_camera_positive_shift(test_img_camera):
     shift_capture_datetime(test_img_camera, datetime_shift)
     assert get_capture_datetime(test_img_camera) == expected_date
     assert capture_datetimes_are_consistent(test_img_camera)
+
+
+def test_shift_capture_datetime_video_camera_positive_shift(test_vid_camera):
+    # From a previous test, we know that the original date  is 2023-06-02 22:35:12.
+    datetime_shift = timedelta(hours=3, minutes=-5, seconds=13)
+    expected_date = datetime(2023, 6, 3, 1, 30, 25)
+
+    shift_capture_datetime(test_vid_camera, datetime_shift)
+    assert get_capture_datetime(test_vid_camera) == expected_date
+    # TODO: this will fail.
+    assert capture_datetimes_are_consistent(test_vid_camera)
 
 
 def test_shift_capture_datetime_video(test_vid):
@@ -198,6 +231,10 @@ def test_get_timezone_img_camera(test_img_camera):
     assert get_timezone(test_img_camera) == timezone(timedelta(hours=2))
 
 
+def test_get_timezone_video_camera(test_vid_camera):
+    assert get_timezone(test_vid_camera) == None
+
+
 def test_get_timezone_video(test_vid):
     assert get_timezone(test_vid) == timezone(timedelta(hours=3))
 
@@ -213,6 +250,17 @@ def test_set_timezone_img_phone(test_img_phone, new_timezone):
     # the estimate of the timezone information. This is how Google Photos work.
     assert get_timezone(test_img_phone, based_on_gps=False) == timezone(new_timezone)
     assert get_capture_datetime(test_img_phone) == expected_date
+
+
+# We test both positive and negative timezone shifts.
+@pytest.mark.parametrize("new_timezone", [timedelta(hours=6), timedelta(hours=-8)])
+def test_set_timezone_video_camera(test_vid_camera, new_timezone):
+    expected_date = datetime(2023, 6, 2, 22, 35, 12)
+    assert get_capture_datetime(test_vid_camera) == expected_date
+
+    set_timezone(test_vid_camera, new_timezone)
+    assert get_timezone(test_vid_camera) == timezone(new_timezone)
+    assert get_capture_datetime(test_vid_camera) == expected_date
 
 
 # We test both positive and negative timezone shifts.

@@ -2,7 +2,8 @@
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Union, List, Optional, Dict, Tuple
-from datetime import time, datetime, timezone, timedelta
+from datetime import time, datetime, timedelta
+from datetime import timezone as tz
 
 import pytz
 import exiftool
@@ -48,15 +49,15 @@ class ExifDateTimeField:
 
         dt = datetime.strptime(field_content, self.format)
         if self.has_timezone_info and dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=tz.utc)
         return dt
 
     def unparse(self, date: datetime) -> str:
         if self.has_timezone_info and date.tzinfo is None:
-            date = date.replace(tzinfo=timezone.utc)
+            date = date.replace(tzinfo=tz.utc)
         if self.has_time_info and self.is_utc:
             # Convert to UTC if needed
-            date = date.astimezone(timezone.utc)
+            date = date.astimezone(tz.utc)
         date_str = date.strftime(self.format)
 
         # TODO: delete this when we're sure that this is not needed anymore.
@@ -177,7 +178,7 @@ def get_timezone(
     file_path: Optional[Union[Path, str]] = None,
     metadata: Optional[Dict[str, str]] = None,
     based_on_gps: bool = True,
-) -> Union[timezone, None]:
+) -> Union[tz, None]:
     """Determine the timezone of a media file based on its metadata.
     -!- Warning: I know for sure this function does *not* have the same behavior
     as Google Photos. Meaning that Google Photos could infer a different datetime
@@ -227,7 +228,7 @@ def get_timezone(
         hours, mins = offset[1:].split(":")
         offset = int(hours) * 60 + int(mins)
 
-        return timezone(timedelta(minutes=int(f"{sign}{offset}")))
+        return tz(timedelta(minutes=int(f"{sign}{offset}")))
 
     # Method 3: we have access to a field that comes with timezone info attached.
     # That is, a field that has:
@@ -278,7 +279,7 @@ def get_timezone(
 
     # We then calculate the difference between the two datetimes.
     diff = naive_datetime - utc_datetime.replace(tzinfo=None)
-    return timezone(diff)
+    return tz(diff)
 
 
 @handle_single_or_list(is_file_path=True)
@@ -490,8 +491,15 @@ def set_timezone(
     file_paths: Union[Path, str, List[Union[Path, str]]], timezone: timedelta
 ) -> None:
     # TODO: have this function use `timezone` as a `timezone` object instead of a `timedelta`.
+    # TODO: the variable name is confusing: we use "timezone", but this corresponds
+    #       to the name of a python module (datetime.timezone).
+    #       Either we import the module as `tz`, or we rename the variable to `tz`.
+    #       Finally, the variable is a timedelta, not a timezone.
     # We need to convert the timezone into "+HH:MM" or "-HH:MM" format.
     # This format will be used by ExifTool.
+    if isinstance(timezone, tz):
+        # Get a timedelta object representing the offset from UTC
+        timezone = timezone.utcoffset(datetime.now())
     hours, remainder = divmod(abs(timezone.total_seconds()), 3600)
     minutes, _ = divmod(remainder, 60)
     sign = "-" if timezone.total_seconds() < 0 else "+"

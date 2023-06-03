@@ -7,6 +7,10 @@ from media_organizer.rename import (
     gps_coords_to_city_name,
 )
 from media_organizer.timeshift import (
+    get_capture_datetime,
+    set_capture_datetime,
+    get_timezone,
+    set_timezone,
     extract_metadata_using_exiftool,
     GPSCoordinates,
 )
@@ -122,5 +126,37 @@ def test_batch_rename(test_img_phone, test_img_camera, test_vid, another_tmp_pat
         assert old_path.with_suffix(old_path.suffix + ".backup").exists()
 
 
-def test_get_rename_plan_when_two_files_have_the_same_datetime():
-    assert False
+def test_get_rename_plan_when_two_files_have_the_same_datetime(
+    test_img_camera, test_img_camera_watch
+):
+    file1, file2 = test_img_camera, test_img_camera_watch
+
+    # Checking that the files are indeed different.
+    assert file1.stat().st_size != file2.stat().st_size
+
+    # Checking that the files have the same capture datetime.
+    target_capture_datetime = get_capture_datetime(file1)
+    target_timezone = get_timezone(file1)
+    set_capture_datetime(file2, target_capture_datetime)
+    set_timezone(file2, target_timezone)
+    assert get_capture_datetime(file2) == target_capture_datetime
+    assert get_timezone(file2) == target_timezone
+
+    # Now renaming the files.
+    rename_plan = _get_rename_plan([file1, file2])
+    assert len(set(rename_plan.values())) == 2
+
+
+def test_real_life():
+    root_dir = Path("C:/Users/RSaba/Pictures/media_organizer/tmp")
+    file_paths = []
+    for file in root_dir.iterdir():
+        if file.suffix.lower() in [".jpg", ".mp4", ".mov"]:
+            file_paths.append(file)
+        # if file.suffix.lower() in [".backup"]:
+        #    # file_paths.append(file)
+        #    import shutil
+
+        #    shutil.move(file, file.with_suffix(""))
+
+    rename(file_paths, output_dir=root_dir.parent / "after", create_backups=False)

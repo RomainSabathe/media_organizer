@@ -2,6 +2,7 @@ import shutil
 from pathlib import Path
 import concurrent.futures
 from datetime import datetime
+from collections import defaultdict
 from typing import List, Union, Dict, Optional
 
 from tqdm import tqdm
@@ -45,7 +46,7 @@ def _get_rename_plan(
     if not isinstance(device_names, list):
         device_names = [device_names]
 
-    # Now putting it all together
+    # Now putting it all together.
     new_names = {}
     iterator = zip(file_paths, capture_datetimes, city_names, device_names)
     for file_path, *info_triplet in iterator:
@@ -54,6 +55,22 @@ def _get_rename_plan(
         info_triplet[0] = format_capture_datetime_for_file_renaming(info_triplet[0])
         new_name = Path("-".join(info_triplet)).with_suffix(file_path.suffix)
         new_names[file_path] = new_name
+
+    # Handle duplicates. This corresponds to the case where two files have the same capture datetime.
+    # (for instance: burst mode on a camera).
+    # TODO: put this in a dedicated function. Change the variable names to make
+    # it more readable/readable.
+    reverse_file_dict = defaultdict(list)
+    for original_name, new_name in new_names.items():
+        reverse_file_dict[new_name].append(original_name)
+
+    for new_name, original_names in reverse_file_dict.items():
+        if len(original_names) > 1:
+            for count, original_name in enumerate(
+                original_names[1:], 1
+            ):  # start with 1 for suffix and skip the first file
+                stem = new_name.stem
+                new_names[original_name] = new_name.with_stem(f"{stem}-{count}")
 
     return new_names
 

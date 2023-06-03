@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from media_organizer.rename import (
     rename,
     rename_one_file,
@@ -144,9 +146,16 @@ def test_get_rename_plan_when_two_files_have_the_same_datetime(
 
     # Now renaming the files.
     rename_plan = _get_rename_plan([file1, file2])
-    assert len(set(rename_plan.values())) == 2
+    assert rename_plan[file1] != rename_plan[file2]
+    assert rename_plan[file1] == Path("2019-12-17_12-03-24_p0200-Fujifilm_X-T20.jpg")
+    assert rename_plan[file2] == Path("2019-12-17_12-03-24_p0200-Fujifilm_X-T20-1.jpg")
 
 
+def test_get_rename_plan_when_two_files_have_the_same_datetime_orders_according_miliseconds():
+    assert False
+
+
+@pytest.mark.skip(reason="Not a real test")
 def test_real_life():
     root_dir = Path("C:/Users/RSaba/Pictures/media_organizer/tmp")
     file_paths = []

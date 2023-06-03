@@ -620,7 +620,7 @@ def gps_coords_to_timezone(coords: GPSCoordinates) -> datetime:
     offset_seconds = now.utcoffset().total_seconds()
     offset_hours = offset_seconds / 3600
 
-    return timezone(timedelta(hours=offset_hours))
+    return tz(timedelta(hours=offset_hours))
 
 
 class ProtectedExifAttributes(Exception):

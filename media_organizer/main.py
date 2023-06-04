@@ -1,13 +1,22 @@
 from pathlib import Path
+from datetime import timedelta
 
-from media_organizer.timeshift import shift_capture_datetime_to_target
+from media_organizer.timeshift import (
+    shift_capture_datetime_to_target,
+    shift_capture_datetime,
+)
 from media_organizer.rename import search_and_rename
 
 
 def main():
-    root_dir = Path("C:/Users/RSaba/Pictures/20230427")
+    root_dir = Path("C:/Users/RSaba/Pictures/20230422")
+    file_paths = list(root_dir.glob("*mp4"))
+    shift_capture_datetime(file_paths, timedelta(minutes=-30))
     search_and_rename(
-        root_dir, output_dir=root_dir.parent / "renamed", create_backups=False
+        root_dir,
+        output_dir=root_dir / "renamed",
+        create_backups=False,
+        recursive=False,
     )
 
 

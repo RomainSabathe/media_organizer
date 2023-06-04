@@ -165,12 +165,13 @@ def extract_metadata_using_exiftool(
         file_paths_as_str = [str(file_path) for file_path in file_paths]
 
         # -ee = ExtractEmbedded. Allows to extract metadata from embedded files (e.g. XMP in JPEG)
-        exiftool_args = ["-ee", *file_paths_as_str]
+        field_names = [f"-{field.name}" for field in DATETIME_FIELDS + GPS_FIELDS]
+        exiftool_args = ["-ee", *field_names, *file_paths_as_str]
         print(f"Running exiftool with args: {exiftool_args}")
         metadatas = et.execute_json(*exiftool_args)
         if len(metadatas) != len(file_paths):
             raise ValueError(
-                f"Expected {len(file_paths)} metadata, got {len(metadata)}"
+                f"Expected {len(file_paths)} metadata, got {len(metadatas)}"
             )
     return metadatas
 
@@ -413,6 +414,7 @@ def set_capture_datetime(
 def shift_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     datetime_shift: timedelta,
+    create_backups: bool = False,
 ) -> None:
     """
     Shifts the capture datetime of the given file(s) by the given timedelta.
@@ -458,6 +460,8 @@ def shift_capture_datetime(
             f"-{field.name}{shift_sign}{shift_days} {shift_hours:02d}:{shift_minutes:02d}:{shift_seconds:02d}"
         )
 
+    if not create_backups:
+        exiftool_cmd.append("-overwrite_original")
     exiftool_cmd.extend([str(f) for f in file_paths])
     with exiftool.ExifTool() as et:
         et.execute(*exiftool_cmd)

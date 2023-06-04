@@ -258,3 +258,7 @@ def test_search_and_rename_with_extra_files_and_output_dir(
             "2022-04-30_09-33-07_p0300-Toliara-GoPro.THM",
             "2022-04-30_09-33-07_p0300-Toliara-GoPro.lRv",
         ]
+
+
+def test_rename_empty_file():
+    assert False

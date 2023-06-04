@@ -56,8 +56,14 @@ def _get_rename_plan(
     iterator = zip(file_paths, capture_datetimes, city_names, device_names)
     for file_path, *info_triplet in iterator:
         info_triplet = [part for part in info_triplet if part is not None]
+        if len(info_triplet) == 0:
+            # This happens with empty files for instance. In which case,
+            # we don't consider this file in the rename plan.
+            continue
+
         # The first element should always be there: it's the capture datetime.
         info_triplet[0] = format_capture_datetime_for_file_renaming(info_triplet[0])
+
         # Applying with_suffix("") to remove the extension and make the function
         # more 'general'. This way the rename plan can be used for other filetypes
         # like XMP, RAF, etc.
@@ -127,6 +133,8 @@ def extract_device_name_from_metadata(metadata: Dict[str, str]) -> str:
     if any(["gopro" in key.lower() for key in metadata.keys()]):
         parts.append("GoPro")
 
+    if len(parts) == 0:
+        return None
     return "_".join(parts)
 
 
@@ -176,7 +184,10 @@ def rename(
         # If an output directory is specified, we'll use that.
         output_paths = [output_dir / p.name for p in output_paths]
 
-    if isinstance(input_paths[0], list):
+    if len(input_paths) == 0:
+        return []
+
+    if isinstance(input_paths, list) and isinstance(input_paths[0], list):
         input_paths = input_paths[0]
 
     batch_rename_plan = dict(zip(input_paths, output_paths))

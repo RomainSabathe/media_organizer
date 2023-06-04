@@ -70,7 +70,7 @@ def test_rename_one_file_no_backup_custom_output_dir(test_img_phone, another_tmp
 
     assert new_path.exists()
     assert not test_img_phone.exists()
-    assert test_img_phone.with_suffix(test_img_phone.suffix + ".backup").exists()
+    assert not test_img_phone.with_suffix(test_img_phone.suffix + ".backup").exists()
 
 
 def test_rename_one_file_with_backup(test_img_phone):

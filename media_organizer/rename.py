@@ -66,6 +66,7 @@ def _get_rename_plan(
 
     for new_name, original_names in reverse_file_dict.items():
         if len(original_names) > 1:
+            original_names = sorted(original_names)
             for count, original_name in enumerate(
                 original_names[1:], 1
             ):  # start with 1 for suffix and skip the first file

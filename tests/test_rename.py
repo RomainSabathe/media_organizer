@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ from media_organizer.timeshift import (
     set_timezone,
     extract_metadata_using_exiftool,
     GPSCoordinates,
+    _print_all_exif_datetimes,
 )
 
 
@@ -151,8 +153,43 @@ def test_get_rename_plan_when_two_files_have_the_same_datetime(
     assert rename_plan[file2] == Path("2019-12-17_12-03-24_p0200-Fujifilm_X-T20-1.jpg")
 
 
-def test_get_rename_plan_when_two_files_have_the_same_datetime_orders_according_miliseconds():
-    assert False
+def test_get_rename_plan_when_two_files_have_the_same_datetime_orders_according_to_filename(
+    test_img_camera, test_img_camera_watch
+):
+    file1, file2 = test_img_camera, test_img_camera_watch
+
+    # Checking that the files are indeed different.
+    assert file1.stat().st_size != file2.stat().st_size
+
+    # Setting the same capture datetime for both files.
+    target_capture_datetime = get_capture_datetime(file1)
+    target_timezone = get_timezone(file1)
+    set_capture_datetime(file2, target_capture_datetime)
+    set_timezone(file2, target_timezone)
+    assert get_capture_datetime(file2) == target_capture_datetime
+    assert get_timezone(file2) == target_timezone
+
+    # Renaming the files so we can more easily compare them.
+    # file1 should be the 'first' image and file2 the 'second' image according to
+    # their name.
+    _file1 = file1.with_name("a.jpg")
+    _file2 = file2.with_name("b.jpg")
+    shutil.move(file1, _file1)
+    shutil.move(file2, _file2)
+    file1, file2 = _file1, _file2
+
+    # Now renaming the files. We try two versions. Both should be equivalent:
+    # 1. where we pass [file1, file2] as input
+    rename_plan = _get_rename_plan([file1, file2])
+    assert rename_plan[file1] != rename_plan[file2]
+    assert rename_plan[file1] == Path("2019-12-17_12-03-24_p0200-Fujifilm_X-T20.jpg")
+    assert rename_plan[file2] == Path("2019-12-17_12-03-24_p0200-Fujifilm_X-T20-1.jpg")
+
+    # 2. where we pass [file2, file1] as input
+    rename_plan = _get_rename_plan([file2, file1])
+    assert rename_plan[file1] != rename_plan[file2]
+    assert rename_plan[file1] == Path("2019-12-17_12-03-24_p0200-Fujifilm_X-T20.jpg")
+    assert rename_plan[file2] == Path("2019-12-17_12-03-24_p0200-Fujifilm_X-T20-1.jpg")
 
 
 @pytest.mark.skip(reason="Not a real test")

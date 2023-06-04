@@ -19,7 +19,8 @@ from media_organizer.timeshift import (
 
 @handle_single_or_list(is_file_path=True)
 def _get_rename_plan(
-    file_paths: Union[Path, str, List[Union[Path, str]]]
+    file_paths: Union[Path, str, List[Union[Path, str]]],
+    return_suffixless: bool = False,
 ) -> Dict[Path, Path]:
     """Return a dictionary of file paths to their new file paths.
     The new file paths are generated using the following format:
@@ -53,8 +54,14 @@ def _get_rename_plan(
         info_triplet = [part for part in info_triplet if part is not None]
         # The first element should always be there: it's the capture datetime.
         info_triplet[0] = format_capture_datetime_for_file_renaming(info_triplet[0])
-        new_name = Path("-".join(info_triplet)).with_suffix(file_path.suffix)
-        new_names[file_path] = new_name
+        # Applying with_suffix("") to remove the extension and make the function
+        # more 'general'. This way the rename plan can be used for other filetypes
+        # like XMP, RAF, etc.
+        new_name = Path("-".join(info_triplet))
+        if return_suffixless:
+            new_name = new_name.with_suffix("")
+        key = file_path if not return_suffixless else file_path.with_suffix("")
+        new_names[key] = new_name
 
     # Handle duplicates. This corresponds to the case where two files have the same capture datetime.
     # (for instance: burst mode on a camera).
@@ -122,6 +129,7 @@ def rename(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     output_dir: Path = None,
     create_backups: bool = True,
+    _rename_plan: Dict[Path, Path] = None,
 ) -> Dict[Path, Path]:
     """Return a dictionary of file paths to their new file paths.
     The new file paths are generated using the following format:
@@ -140,7 +148,9 @@ def rename(
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
 
-    rename_plan = _get_rename_plan(file_paths)
+    rename_plan = (
+        _rename_plan if _rename_plan is not None else _get_rename_plan(file_paths)
+    )
 
     # TODO: SO f*cking ugly.
     # The "handle_single_or_list" decorator was a bad idea.
@@ -164,6 +174,20 @@ def rename(
     if isinstance(input_paths[0], list):
         input_paths = input_paths[0]
 
+    batch_rename_plan = dict(zip(input_paths, output_paths))
+    batch_rename(batch_rename_plan, create_backups=create_backups)
+
+    # Simulating the behavior of the "handle_single_or_list" decorator.
+    # TODO: This is until I clean it up and remove @handle_single_or_list.
+    if isinstance(file_paths, list):
+        return dict(zip(input_paths, output_paths))
+    return output_paths[0]
+
+
+def batch_rename(rename_plan: Dict[Path, Path], create_backups: bool = True) -> None:
+    input_paths = list(rename_plan.keys())
+    output_paths = list(rename_plan.values())
+
     with concurrent.futures.ProcessPoolExecutor() as executor:
         try:
             results = tqdm(
@@ -175,19 +199,11 @@ def rename(
                 ),
                 total=len(input_paths),
             )
-            for result in results:
-                print(result)
         except KeyboardInterrupt:
             return
         except Exception as e:
             print(e)
             return
-
-    # Simulating the behavior of the "handle_single_or_list" decorator.
-    # TODO: This is until I clean it up and remove @handle_single_or_list.
-    if isinstance(file_paths, list):
-        return dict(zip(input_paths, output_paths))
-    return output_paths[0]
 
 
 def rename_one_file(inp: str, outp: str, create_backup: bool = True):
@@ -223,8 +239,31 @@ def search_and_rename(
     create_backups=True,
     recursive=True,
     file_types=None,
+    extra_file_types=None,
 ):
     """Search for files in a directory and rename them."""
+    if file_types is None:
+        file_types = [".jpg", ".jpeg", ".mp4", ".mov"]
+    if extra_file_types is None:
+        extra_file_types = [".xmp", ".thm", ".lrv", ".raf"]
+
+    media_files = list_files(input_dir, recursive, file_types)
+    extra_files = list_files(input_dir, recursive, extra_file_types)
+    suffixless_rename_plan = _get_rename_plan(media_files, return_suffixless=True)
+
+    rename_plan = {}
+    for file in media_files + extra_files:
+        key = file.with_suffix("")
+        if key in suffixless_rename_plan:
+            value = suffixless_rename_plan[key].with_suffix(file.suffix)
+            rename_plan[file] = value
+
+    # TODO: it's dirty to pass in "None" as file_paths.
+    rename(None, output_dir, create_backups, rename_plan)
+
+
+def list_files(input_dir: Path, recursive=True, file_types=None):
+    """List all files in a directory."""
     if file_types is None:
         file_types = [".jpg", ".jpeg", ".mp4", ".mov"]
 
@@ -232,5 +271,4 @@ def search_and_rename(
     for file_type in file_types:
         glob_pattern = f"**/*{file_type}" if recursive else f"*{file_type}"
         file_paths.extend(input_dir.glob(glob_pattern))
-
-    rename(file_paths, output_dir, create_backups)
+    return file_paths

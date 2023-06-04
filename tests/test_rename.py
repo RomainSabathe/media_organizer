@@ -218,12 +218,13 @@ def test_search_and_rename_with_extra_files(
     assert not test_img_phone.exists()
     assert not test_img_camera.exists()
     assert not test_vid.exists()
+
     for filename in tmp_path.iterdir():
         assert filename.name in [
             "2023-05-17_09-30-03_p0200-Zonza-Huawei_VOG-L09.jpg",
             "2023-05-17_09-30-03_p0200-Zonza-Huawei_VOG-L09.XMP",
-            "2019-12-17_12-03-24_p0200-Fujifilm_X-T20.jpg"
-            "2019-12-17_12-03-24_p0200-Fujifilm_X-T20.RAF"
+            "2019-12-17_12-03-24_p0200-Fujifilm_X-T20.jpg",
+            "2019-12-17_12-03-24_p0200-Fujifilm_X-T20.RAF",
             "2022-04-30_09-33-07_p0300-Toliara-GoPro.mp4",
             "2022-04-30_09-33-07_p0300-Toliara-GoPro.THM",
             "2022-04-30_09-33-07_p0300-Toliara-GoPro.lRv",

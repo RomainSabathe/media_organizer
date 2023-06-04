@@ -31,23 +31,27 @@ def _get_rename_plan(
     <extension> is the file extension.
     """
     # Part 1: capture datetime.
+    print("Extracting capture datetimes...")
     metadatas = extract_metadata_using_exiftool(file_paths)
     capture_datetimes = get_capture_datetime(file_paths, force_return_timezone=True)
     if not isinstance(capture_datetimes, list):
         capture_datetimes = [capture_datetimes]
 
     # Part 2: city name
+    print("Extracting city names...")
     gps_coords = GPSCoordinates.from_exif_metadata(metadatas)
     city_names = gps_coords_to_city_name(gps_coords)
     if not isinstance(city_names, list):
         city_names = [city_names]
 
     # Part 3: device name
+    print("Extracting device names...")
     device_names = extract_device_name_from_metadata(metadatas)
     if not isinstance(device_names, list):
         device_names = [device_names]
 
     # Now putting it all together.
+    print("Generating rename plan...")
     new_names = {}
     iterator = zip(file_paths, capture_datetimes, city_names, device_names)
     for file_path, *info_triplet in iterator:
@@ -58,8 +62,8 @@ def _get_rename_plan(
         # more 'general'. This way the rename plan can be used for other filetypes
         # like XMP, RAF, etc.
         new_name = Path("-".join(info_triplet))
-        if return_suffixless:
-            new_name = new_name.with_suffix("")
+        suffix = "" if return_suffixless else file_path.suffix
+        new_name = new_name.with_suffix(suffix)
         key = file_path if not return_suffixless else file_path.with_suffix("")
         new_names[key] = new_name
 
@@ -67,6 +71,7 @@ def _get_rename_plan(
     # (for instance: burst mode on a camera).
     # TODO: put this in a dedicated function. Change the variable names to make
     # it more readable/readable.
+    print("Handling duplicates...")
     reverse_file_dict = defaultdict(list)
     for original_name, new_name in new_names.items():
         reverse_file_dict[new_name].append(original_name)

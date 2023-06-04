@@ -166,6 +166,7 @@ def extract_metadata_using_exiftool(
 
         # -ee = ExtractEmbedded. Allows to extract metadata from embedded files (e.g. XMP in JPEG)
         exiftool_args = ["-ee", *file_paths_as_str]
+        print(f"Running exiftool with args: {exiftool_args}")
         metadatas = et.execute_json(*exiftool_args)
         if len(metadatas) != len(file_paths):
             raise ValueError(

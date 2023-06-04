@@ -258,19 +258,3 @@ def test_search_and_rename_with_extra_files_and_output_dir(
             "2022-04-30_09-33-07_p0300-Toliara-GoPro.THM",
             "2022-04-30_09-33-07_p0300-Toliara-GoPro.lRv",
         ]
-
-
-@pytest.mark.skip(reason="Not a real test")
-def test_real_life():
-    root_dir = Path("C:/Users/RSaba/Pictures/media_organizer/tmp")
-    file_paths = []
-    for file in root_dir.iterdir():
-        if file.suffix.lower() in [".jpg", ".mp4", ".mov"]:
-            file_paths.append(file)
-        # if file.suffix.lower() in [".backup"]:
-        #    # file_paths.append(file)
-        #    import shutil
-
-        #    shutil.move(file, file.with_suffix(""))
-
-    rename(file_paths, output_dir=root_dir.parent / "after", create_backups=False)

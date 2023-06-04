@@ -215,3 +215,22 @@ def rename_one_file(inp: str, outp: str, create_backup: bool = True):
         if backup_path and backup_path.exists():
             shutil.move(backup_path, inp)
         raise e
+
+
+def search_and_rename(
+    input_dir: Path,
+    output_dir: Path = None,
+    create_backups=True,
+    recursive=True,
+    file_types=None,
+):
+    """Search for files in a directory and rename them."""
+    if file_types is None:
+        file_types = [".jpg", ".jpeg", ".mp4", ".mov"]
+
+    file_paths = []
+    for file_type in file_types:
+        glob_pattern = f"**/*{file_type}" if recursive else f"*{file_type}"
+        file_paths.extend(input_dir.glob(glob_pattern))
+
+    rename(file_paths, output_dir, create_backups)

@@ -4,19 +4,20 @@ from pathlib import Path
 import pytest
 
 from media_organizer.rename import (
-    rename,
-    rename_one_file,
     _get_rename_plan,
     gps_coords_to_city_name,
+    rename,
+    rename_one_file,
+    search_and_rename,
 )
 from media_organizer.timeshift import (
-    get_capture_datetime,
-    set_capture_datetime,
-    get_timezone,
-    set_timezone,
-    extract_metadata_using_exiftool,
     GPSCoordinates,
     _print_all_exif_datetimes,
+    extract_metadata_using_exiftool,
+    get_capture_datetime,
+    get_timezone,
+    set_capture_datetime,
+    set_timezone,
 )
 
 
@@ -190,6 +191,22 @@ def test_get_rename_plan_when_two_files_have_the_same_datetime_orders_according_
     assert rename_plan[file1] != rename_plan[file2]
     assert rename_plan[file1] == Path("2019-12-17_12-03-24_p0200-Fujifilm_X-T20.jpg")
     assert rename_plan[file2] == Path("2019-12-17_12-03-24_p0200-Fujifilm_X-T20-1.jpg")
+
+
+def test_search_and_rename(test_img_phone, test_vid, tmp_path):
+    search_and_rename(tmp_path, create_backups=False)
+
+    assert not test_img_phone.exists()
+    assert not test_vid.exists()
+    for filename in tmp_path.iterdir():
+        assert filename.name in [
+            "2023-05-17_09-30-03_p0200-Zonza-Huawei_VOG-L09.jpg",
+            "2022-04-30_09-33-07_p0300-Toliara-GoPro.mp4",
+        ]
+
+
+def test_search_and_rename_with_extra_files(test_img_camera, test_vid, tmp_path):
+    assert False
 
 
 @pytest.mark.skip(reason="Not a real test")

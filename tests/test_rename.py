@@ -136,7 +136,7 @@ def test_get_rename_plan_when_two_files_have_the_same_datetime(
     # Checking that the files are indeed different.
     assert file1.stat().st_size != file2.stat().st_size
 
-    # Checking that the files have the same capture datetime.
+    # Setting the same capture datetime for both files.
     target_capture_datetime = get_capture_datetime(file1)
     target_timezone = get_timezone(file1)
     set_capture_datetime(file2, target_capture_datetime)

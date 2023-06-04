@@ -136,7 +136,8 @@ def rename(
                     If None, the files will be moved to the same directory as the original files.
         create_backups: Whether to create a backup of the original file.
     """
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     rename_plan = _get_rename_plan(file_paths)
 
@@ -183,7 +184,6 @@ def rename(
 
     # Simulating the behavior of the "handle_single_or_list" decorator.
     # TODO: This is until I clean it up and remove @handle_single_or_list.
-    return
     if isinstance(file_paths, list):
         return dict(zip(input_paths, output_paths))
     return output_paths[0]

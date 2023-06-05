@@ -165,8 +165,7 @@ def extract_metadata_using_exiftool(
         file_paths_as_str = [str(file_path) for file_path in file_paths]
 
         # -ee = ExtractEmbedded. Allows to extract metadata from embedded files (e.g. XMP in JPEG)
-        field_names = [f"-{field.name}" for field in DATETIME_FIELDS + GPS_FIELDS]
-        exiftool_args = ["-ee", *field_names, *file_paths_as_str]
+        exiftool_args = ["-ee", *file_paths_as_str]
         print(f"Running exiftool with args: {exiftool_args}")
         metadatas = et.execute_json(*exiftool_args)
         if len(metadatas) != len(file_paths):
@@ -288,8 +287,10 @@ def get_timezone(
 def get_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     force_return_timezone: bool = False,
+    metadatas: Optional[List[Dict[str, str]]] = None,
 ) -> Union[datetime, List[datetime], None, List[None]]:
-    metadatas = extract_metadata_using_exiftool(file_paths)
+    if metadatas is None:
+        metadatas = extract_metadata_using_exiftool(file_paths)
     if not isinstance(metadatas, list):
         metadatas = [metadatas]
 
@@ -390,7 +391,9 @@ def capture_datetimes_are_consistent(
 
 @handle_single_or_list(is_file_path=True)
 def set_capture_datetime(
-    file_paths: Union[Path, str, List[Union[Path, str]]], new_datetime: datetime
+    file_paths: Union[Path, str, List[Union[Path, str]]],
+    new_datetime: datetime,
+    create_backups: bool = False,
 ) -> None:
     """Sets the capture datetime of the given file(s) to the given datetime.
     !! Warning !!: this function will erase the timezone information of the different files.
@@ -405,6 +408,8 @@ def set_capture_datetime(
     for field in DATETIME_FIELDS:
         new_datetime_str = field.unparse(new_datetime)
         exiftool_cmd.append(f"-{field.name}={new_datetime_str}")
+    if not create_backups:
+        exiftool_cmd.append("-overwrite_original")
     exiftool_cmd.extend([str(f) for f in file_paths])
     with exiftool.ExifTool() as et:
         et.execute(*exiftool_cmd)
@@ -493,7 +498,9 @@ def _print_all_exif_gps_info(file_path: Union[Path, str]) -> None:
 
 @handle_single_or_list(is_file_path=True)
 def set_timezone(
-    file_paths: Union[Path, str, List[Union[Path, str]]], timezone: timedelta
+    file_paths: Union[Path, str, List[Union[Path, str]]],
+    timezone: timedelta,
+    create_backups: bool = False,
 ) -> None:
     # TODO: have this function use `timezone` as a `timezone` object instead of a `timedelta`.
     # TODO: the variable name is confusing: we use "timezone", but this corresponds
@@ -541,6 +548,8 @@ def set_timezone(
     exiftool_cmd.append("-api")
     exiftool_cmd.append("-QuickTimeUTC=1")
 
+    if not create_backups:
+        exiftool_cmd.append("-overwrite_original")
     exiftool_cmd.extend([str(f) for f in file_paths])
     with exiftool.ExifTool() as et:
         et.execute(*exiftool_cmd)
@@ -659,7 +668,7 @@ def shift_capture_datetime_to_target(
           to match the clock's time.
     """
     # Calculting the datetime delta to apply.
-    ref_datetime = get_capture_datetime(reference_img)
+    ref_datetime = get_capture_datetime(reference_img).replace(tzinfo=None)
     # We need to transform `target_time` to a datetime object (if it's not already)
     # For this, we give it the same day as the reference file.
     if not isinstance(target_time, datetime):

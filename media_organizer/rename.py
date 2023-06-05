@@ -33,7 +33,9 @@ def _get_rename_plan(
     # Part 1: capture datetime.
     print("Extracting capture datetimes...")
     metadatas = extract_metadata_using_exiftool(file_paths)
-    capture_datetimes = get_capture_datetime(file_paths, force_return_timezone=True)
+    capture_datetimes = get_capture_datetime(
+        file_paths, metadatas=metadatas, force_return_timezone=True
+    )
     if not isinstance(capture_datetimes, list):
         capture_datetimes = [capture_datetimes]
 
@@ -266,6 +268,10 @@ def search_and_rename(
     media_files = list_files(input_dir, recursive, file_types)
     extra_files = list_files(input_dir, recursive, extra_file_types)
     suffixless_rename_plan = _get_rename_plan(media_files, return_suffixless=True)
+    if not isinstance(suffixless_rename_plan, dict):
+        suffixless_rename_plan = {
+            media_files[0].with_suffix(""): suffixless_rename_plan
+        }
 
     rename_plan = {}
     for file in media_files + extra_files:

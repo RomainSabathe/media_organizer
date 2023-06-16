@@ -4,20 +4,23 @@ import pytest
 
 from media_organizer.rename import extract_device_name_from_metadata
 from media_organizer.timeshift import (
-    set_timezone,
-    get_timezone,
-    get_capture_datetime,
-    set_capture_datetime,
-    shift_capture_datetime,
-    shift_capture_datetime_to_target,
-    remove_gps_info,
-    capture_datetimes_are_consistent,
-    extract_metadata_using_exiftool,
+    GPSCoordinates,
+    PHOTO_DATETIME_FIELDS,
+    ProtectedExifAttributes,
+    VIDEO_DATETIME_FIELDS,
     _print_all_exif_datetimes,
     _print_all_exif_gps_info,
+    capture_datetimes_are_consistent,
+    express_video_datetime_as_utc,
+    extract_metadata_using_exiftool,
+    get_capture_datetime,
+    get_timezone,
     gps_coords_to_timezone,
-    GPSCoordinates,
-    ProtectedExifAttributes,
+    remove_gps_info,
+    set_capture_datetime,
+    set_timezone,
+    shift_capture_datetime,
+    shift_capture_datetime_to_target,
 )
 
 
@@ -425,3 +428,57 @@ def test_shift_capture_datetime_to_target_many_at_time_with_day_shift(
     assert get_capture_datetime(test_img_phone) == expected_date_img_phone
     assert get_capture_datetime(test_img_camera) == expected_date_img_camera
     assert get_capture_datetime(test_vid) == expected_date_vid
+
+
+def test_express_video_datetime_as_utc(test_vid_camera):
+    # Setting the scene: checking that the capture datetime is expected.
+    dt = get_capture_datetime(test_vid_camera)
+    expected_dt = datetime(2023, 6, 2, 22, 35, 12)  # from a previous test.
+    assert dt == expected_dt
+
+    # Checking that the "photo" datetime field has the same datetime.
+    # "photo" fields usually are more well-behaved (can be expressed with
+    # with a timezone, doesn't require to be expressed in UTC).
+    metadata = extract_metadata_using_exiftool(test_vid_camera)
+    photo_field = PHOTO_DATETIME_FIELDS[0]
+    assert metadata[photo_field.name] == photo_field.unparse(expected_dt)
+
+    # Checking that the "video" datetime field is currently the same as
+    # "photo" datetime field (at least up to the hour). This theoretically
+    # shouldn't be the case! Because "video" datetime fields are expressed in UTC.
+    video_field = VIDEO_DATETIME_FIELDS[0]
+    photo_dt = photo_field.parse(metadata[photo_field.name])
+    video_dt = video_field.parse(metadata[video_field.name])
+    assert photo_dt.date() == video_dt.date()
+    assert photo_dt.hour == video_dt.hour
+    assert photo_dt.minute == video_dt.minute
+
+    # Now, let's express the "video" datetime field in UTC.
+    # First, since this video file doesn't have a timezone, the function
+    # should not work.
+    with pytest.raises(ValueError):
+        express_video_datetime_as_utc(test_vid_camera, errors="raise")
+
+    # To circumvent the error, we can set the errors argument to "coerce".
+    # The issue is that this will use the operating system's timezone and
+    # will lead to a variable result depending on the machine.
+    # Instead, we can hard assign a timezone.
+    set_timezone(test_vid_camera, timedelta(seconds=7200))
+
+    # Now finally we can express the video datetime in UTC.
+    express_video_datetime_as_utc(test_vid_camera, errors="raise")
+
+    # The 'photo' datetime and overall 'capture datetime' should be unchanged.
+    dt = get_capture_datetime(test_vid_camera)
+    assert dt == expected_dt
+
+    # The 'video' datetime should now be shifted from the 'photo' datetime by
+    # 2 hours.
+    metadata = extract_metadata_using_exiftool(test_vid_camera)
+    photo_dt = photo_field.parse(metadata[photo_field.name])
+    video_dt = video_field.parse(metadata[video_field.name])
+    assert photo_dt.date() == video_dt.date()
+    assert photo_dt.hour == video_dt.hour + 2
+    assert photo_dt.minute == video_dt.minute
+
+

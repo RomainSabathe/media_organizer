@@ -36,6 +36,8 @@ def dispatch_according_to_datetime(
         file = Path(file)
         if not file.exists():
             continue
+        if not file.is_file():
+            continue
         try:
             year, month, *_ = file.name.split("-")
             if not year.isdigit() or not month.isdigit():

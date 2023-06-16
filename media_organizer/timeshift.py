@@ -77,7 +77,7 @@ class ExifDateTimeField:
         return hash(self.name)
 
     def __eq__(self, other):
-        if isinstance(other, ExifDateTimeTag):
+        if isinstance(other, ExifDateTimeField):
             return self.name == other.name
         return False
 
@@ -389,11 +389,25 @@ def capture_datetimes_are_consistent(
     return True
 
 
+def express_video_datetime_as_utc(file_path: Path, errors: str = "raise"):
+    metadata = extract_metadata_using_exiftool(file_path)
+    timezone = get_timezone(file_path, metadata=metadata)
+    if timezone is None:
+        if errors == "raise":
+            raise ValueError(f"The file {file_path} has no timezone information.")
+        # If the file doesn't have a timezone, we'll use the timezone
+        # of the operating system instead.
+        timezone = datetime.utcnow().astimezone().tzinfo
+
+    offset = -timezone.utcoffset(datetime.now())
+    shift_capture_datetime(file_path, offset, exif_fields=VIDEO_DATETIME_FIELDS)
+
+
 @handle_single_or_list(is_file_path=True)
 def set_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     new_datetime: datetime,
-    create_backups: bool = False,
+    create_backups: bool = True,
 ) -> None:
     """Sets the capture datetime of the given file(s) to the given datetime.
     !! Warning !!: this function will erase the timezone information of the different files.
@@ -419,7 +433,8 @@ def set_capture_datetime(
 def shift_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     datetime_shift: timedelta,
-    create_backups: bool = False,
+    create_backups: bool = True,
+    exif_fields: Optional[List[ExifDateTimeField]] = None,
 ) -> None:
     """
     Shifts the capture datetime of the given file(s) by the given timedelta.
@@ -429,12 +444,15 @@ def shift_capture_datetime(
         file_paths: The file(s) whose capture datetime will be shifted.
         datetime_shift: The timedelta by which the capture datetime will be shifted.
     """
+    if exif_fields is None:
+        exif_fields = DATETIME_FIELDS
+
     exiftool_cmd = []
     # Important note: we *don't* use the "-AllDates+=..." option because it
     # doesn't update some fields (e.g. QuickTime:MediaCreateDate).
     # Explicitely iterating over each identified datetimefield ensures that
     # indeed all fields are updated.
-    for field in DATETIME_FIELDS:
+    for field in exif_fields:
         datetime_shift_copy = datetime_shift
         # We must apply special care to the following case (when both of the
         # following conditions are true):
@@ -500,7 +518,7 @@ def _print_all_exif_gps_info(file_path: Union[Path, str]) -> None:
 def set_timezone(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     timezone: timedelta,
-    create_backups: bool = False,
+    create_backups: bool = True,
 ) -> None:
     # TODO: have this function use `timezone` as a `timezone` object instead of a `timedelta`.
     # TODO: the variable name is confusing: we use "timezone", but this corresponds

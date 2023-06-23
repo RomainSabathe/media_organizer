@@ -283,7 +283,7 @@ def test_set_timezone_video_gopro(test_vid_gopro, new_timezone):
 
     set_timezone(test_vid_gopro, new_timezone)
     # TODO: this will fail. Need to investigate.
-    assert get_timezone(test_vid_gopro) == timezone(new_timezone)
+    assert get_timezone(test_vid_gopro, based_on_gps=False) == timezone(new_timezone)
     assert get_capture_datetime(test_vid_gopro) == expected_datetime
 
 

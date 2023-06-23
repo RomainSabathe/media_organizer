@@ -1,7 +1,7 @@
 """Functions for adjusting the capture datetime of media files (photos and videos) based on a source of truth."""
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Union, List, Optional, Dict, Tuple
+from typing import Union, List, Optional, Dict, Tuple, Literal
 from datetime import time, datetime, timedelta
 from datetime import timezone as tz
 
@@ -293,6 +293,8 @@ def get_timezone(
 @handle_single_or_list(is_file_path=True)
 def get_capture_datetime(
     file_paths: Union[Path, str, List[Union[Path, str]]],
+    with_timezone: bool = False,
+    timezone: Union[Literal["local"], Literal["utc"]] = "local",
     force_return_timezone: bool = False,
     metadatas: Optional[List[Dict[str, str]]] = None,
 ) -> Union[datetime, List[datetime], None, List[None]]:
@@ -301,16 +303,29 @@ def get_capture_datetime(
     if not isinstance(metadatas, list):
         metadatas = [metadatas]
 
+    if timezone != "local":
+        raise NotImplementedError
+    if not with_timezone and force_return_timezone:
+        raise NotImplementedError
+
     # Embarrassingly parallel. But this is fast given that it's just
     # dictionary lookups.
     return [
-        _get_capture_datetime_from_metadata(metadata, force_return_timezone)
+        _get_capture_datetime_from_metadata(
+            metadata,
+            with_timezone=with_timezone,
+            force_return_timezone=force_return_timezone,
+            timezone=timezone,
+        )
         for metadata in metadatas
     ]
 
 
 def _get_capture_datetime_from_metadata(
-    metadata: Dict[str, str], force_return_timezone: bool = False
+    metadata: Dict[str, str],
+    with_timezone: bool = False,
+    timezone: Union[Literal["local"], Literal["utc"]] = "local",
+    force_return_timezone: bool = False,
 ) -> Union[datetime, None]:
     """Get the capture datetime from a metadata dictionary.
     This function is used internally by get_capture_datetime.
@@ -325,14 +340,17 @@ def _get_capture_datetime_from_metadata(
             break
 
     # Formatting and returning.
-    if exif_field is not None:
-        capture_datetime = exif_field.parse(metadata[exif_field.name])
-        if force_return_timezone:
-            capture_datetime = capture_datetime.replace(
-                tzinfo=get_timezone(metadata=metadata)
-            )
-        return capture_datetime
-    return None  # Returns None if no capture date was found
+    if exif_field is None:
+        return None
+
+    capture_datetime = exif_field.parse(metadata[exif_field.name])
+    if force_return_timezone:
+        capture_datetime = capture_datetime.replace(
+            tzinfo=get_timezone(metadata=metadata)
+        )
+    if not with_timezone:
+        capture_datetime = capture_datetime.replace(tzinfo=None)
+    return capture_datetime
 
 
 def capture_datetimes_are_consistent(

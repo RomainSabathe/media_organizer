@@ -61,8 +61,8 @@ def test_get_capture_datetime_video_camera(test_vid_camera):
     assert capture_datetimes_are_consistent(test_vid_camera)
 
 
-def test_get_capture_datetime_video(test_vid_gopro):
-    expected_date = datetime(2022, 4, 30, 9, 33, 7)
+def test_get_capture_datetime_video_gopro(test_vid_gopro):
+    expected_date = datetime(2023, 6, 23, 16, 7, 15)
     assert get_capture_datetime(test_vid_gopro) == expected_date
     assert capture_datetimes_are_consistent(test_vid_gopro)
 
@@ -74,7 +74,7 @@ def test_get_capture_datetime_batch(test_img_phone, test_img_camera, test_vid_go
     assert capture_datetimes == [
         datetime(2023, 5, 17, 9, 30, 3),
         datetime(2019, 12, 17, 12, 3, 24),
-        datetime(2022, 4, 30, 9, 33, 7),
+        datetime(2023, 6, 23, 16, 7, 15),
     ]
 
 
@@ -170,10 +170,10 @@ def test_shift_capture_datetime_video_camera_positive_shift(test_vid_camera):
     assert capture_datetimes_are_consistent(test_vid_camera)
 
 
-def test_shift_capture_datetime_video(test_vid_gopro):
-    # From a previous test, we know that original date is 2022-04-30 09:33:07.
+def test_shift_capture_datetime_video_gopro(test_vid_gopro):
+    # From a previous test, we know that original date is 2023-06-23 16:07:15
     datetime_shift = timedelta(hours=-2, minutes=47, seconds=13)
-    expected_date = datetime(2022, 4, 30, 8, 20, 20)
+    expected_date = datetime(2023, 6, 23, 14, 54, 28)
 
     shift_capture_datetime(test_vid_gopro, datetime_shift)
     assert get_capture_datetime(test_vid_gopro) == expected_date
@@ -181,9 +181,9 @@ def test_shift_capture_datetime_video(test_vid_gopro):
 
 
 def test_shift_capture_datetime_video_positive_shift(test_vid_gopro):
-    # From a previous test, we know that original date is 2022-04-30 09:33:07.
+    # From a previous test, we know that original date is 2023-06-23 16:07:15
     datetime_shift = timedelta(hours=3, minutes=-5, seconds=13)
-    expected_date = datetime(2022, 4, 30, 12, 28, 20)
+    expected_date = datetime(2023, 6, 23, 19, 2, 28)
 
     shift_capture_datetime(test_vid_gopro, datetime_shift)
     assert get_capture_datetime(test_vid_gopro) == expected_date
@@ -196,7 +196,7 @@ def test_shift_capture_datetime_many_at_a_time(
     # See previous tests for explanation of these dates.
     expected_date_img_phone = datetime(2023, 5, 17, 8, 17, 16)
     expected_date_img_camera = datetime(2019, 12, 17, 10, 50, 37)
-    expected_date_vid = datetime(2022, 4, 30, 8, 20, 20)
+    expected_date_vid = datetime(2023, 6, 23, 14, 54, 28)
     datetime_shift = timedelta(hours=-2, minutes=47, seconds=13)
 
     shift_capture_datetime([test_img_phone, test_img_camera, test_vid_gopro], datetime_shift)
@@ -214,7 +214,7 @@ def test_shift_capture_datetime_many_at_a_time_positive_shift(
     # See previous tests for explanation of these dates.
     expected_date_img_phone = datetime(2023, 5, 17, 12, 25, 16)
     expected_date_img_camera = datetime(2019, 12, 17, 14, 58, 37)
-    expected_date_vid = datetime(2022, 4, 30, 12, 28, 20)
+    expected_date_vid = datetime(2023, 6, 23, 19, 2, 28)
     datetime_shift = timedelta(hours=3, minutes=-5, seconds=13)
 
     shift_capture_datetime([test_img_phone, test_img_camera, test_vid_gopro], datetime_shift)
@@ -238,8 +238,8 @@ def test_get_timezone_video_camera(test_vid_camera):
     assert get_timezone(test_vid_camera) == None
 
 
-def test_get_timezone_video(test_vid_gopro):
-    assert get_timezone(test_vid_gopro) == timezone(timedelta(hours=3))
+def test_get_timezone_video_gopro(test_vid_gopro):
+    assert get_timezone(test_vid_gopro) == timezone(timedelta(hours=2))
 
 
 # We test both positive and negative timezone shifts.
@@ -268,14 +268,14 @@ def test_set_timezone_video_camera(test_vid_camera, new_timezone):
 
 # We test both positive and negative timezone shifts.
 @pytest.mark.parametrize("new_timezone", [timedelta(hours=6), timedelta(hours=-8)])
-def test_set_timezone_video(test_vid_gopro, new_timezone):
-    expected_date = datetime(2022, 4, 30, 9, 33, 7)
+def test_set_timezone_video_gopro(test_vid_gopro, new_timezone):
+    expected_date = datetime(2023, 6, 23, 16, 7, 15)
     assert get_capture_datetime(test_vid_gopro) == expected_date
 
     set_timezone(test_vid_gopro, new_timezone)
-    _print_all_exif_datetimes(test_vid_gopro)
-    # assert get_timezone(test_vid_gopro) == timezone(new_timezone)
-    # assert get_capture_datetime(test_vid_gopro) == expected_date
+    # TODO: this will fail. Need to investigate.
+    assert get_timezone(test_vid_gopro) == timezone(new_timezone)
+    assert get_capture_datetime(test_vid_gopro) == expected_date
 
 
 def test_google_photos(test_img_phone, test_vid_gopro):
@@ -320,7 +320,7 @@ def test_remove_gps_info_photos(test_img):
     assert all([metadata.get(gps_field) is None for gps_field in gps_fields])
 
 
-def test_remove_gps_info_video(test_vid_gopro):
+def test_remove_gps_info_video_gopro(test_vid_gopro):
     # We can't remove GPS info from GoPro videos because it's stored in an
     # embedded field of Exif metadata.
     with pytest.raises(ProtectedExifAttributes):
@@ -365,9 +365,9 @@ def test_get_timezone_from_gps_coords_batch(test_img_phone, test_img_camera, tes
     gps_coords = GPSCoordinates.from_exif_metadata(metadatas)
     extracted_timezones = gps_coords_to_timezone(gps_coords)
 
-    assert extracted_timezones[0] == timezone(timedelta(hours=2))
+    assert extracted_timezones[0] == timezone(timedelta(hours=+2))
     assert extracted_timezones[1] is None
-    assert extracted_timezones[2] == timezone(timedelta(hours=+3))
+    assert extracted_timezones[2] == timezone(timedelta(hours=+2))
 
 
 def test_shift_capture_datetime_to_target_trivial(test_img_camera_watch):
@@ -392,7 +392,7 @@ def test_shift_capture_datetime_to_target_many_at_time(
 ):
     # The watch indicates "21:03"
     # The time of the image is 19:15:14
-    # This is a time delta of 1h48m46s
+    # This is a time delta of 1h48m46s, rounded to 1h48.
 
     shift_capture_datetime_to_target(
         [test_img_phone, test_img_camera, test_vid_gopro],
@@ -402,7 +402,7 @@ def test_shift_capture_datetime_to_target_many_at_time(
 
     expected_date_img_phone = datetime(2023, 5, 17, 11, 18, 3)
     expected_date_img_camera = datetime(2019, 12, 17, 13, 51, 24)
-    expected_date_vid = datetime(2022, 4, 30, 11, 21, 7)
+    expected_date_vid = datetime(2023, 6, 23, 17, 55, 15)
     assert get_capture_datetime(test_img_phone) == expected_date_img_phone
     assert get_capture_datetime(test_img_camera) == expected_date_img_camera
     assert get_capture_datetime(test_vid_gopro) == expected_date_vid
@@ -424,7 +424,7 @@ def test_shift_capture_datetime_to_target_many_at_time_with_day_shift(
 
     expected_date_img_phone = datetime(2023, 5, 16, 11, 18, 3)
     expected_date_img_camera = datetime(2019, 12, 16, 13, 51, 24)
-    expected_date_vid = datetime(2022, 4, 29, 11, 21, 7)
+    expected_date_vid = datetime(2023, 6, 22, 17, 55, 15)
     assert get_capture_datetime(test_img_phone) == expected_date_img_phone
     assert get_capture_datetime(test_img_camera) == expected_date_img_camera
     assert get_capture_datetime(test_vid_gopro) == expected_date_vid

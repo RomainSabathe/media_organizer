@@ -8,6 +8,7 @@ from media_organizer.timeshift import (
     PHOTO_DATETIME_FIELDS,
     ProtectedExifAttributes,
     VIDEO_DATETIME_FIELDS,
+    ExifDateTimeField,
     _print_all_exif_datetimes,
     _print_all_exif_gps_info,
     capture_datetimes_are_consistent,
@@ -22,6 +23,10 @@ from media_organizer.timeshift import (
     shift_capture_datetime,
     shift_capture_datetime_to_target,
 )
+
+
+def datetime_approx_equal(dt1, dt2, delta=60):
+    return abs(dt1 - dt2).total_seconds() <= delta
 
 
 def test_extract_metadata_multiple_files(test_img_phone, test_img_camera):
@@ -199,7 +204,9 @@ def test_shift_capture_datetime_many_at_a_time(
     expected_date_vid = datetime(2023, 6, 23, 14, 54, 28)
     datetime_shift = timedelta(hours=-2, minutes=47, seconds=13)
 
-    shift_capture_datetime([test_img_phone, test_img_camera, test_vid_gopro], datetime_shift)
+    shift_capture_datetime(
+        [test_img_phone, test_img_camera, test_vid_gopro], datetime_shift
+    )
     assert get_capture_datetime(test_img_phone) == expected_date_img_phone
     assert get_capture_datetime(test_img_camera) == expected_date_img_camera
     assert get_capture_datetime(test_vid_gopro) == expected_date_vid
@@ -217,7 +224,9 @@ def test_shift_capture_datetime_many_at_a_time_positive_shift(
     expected_date_vid = datetime(2023, 6, 23, 19, 2, 28)
     datetime_shift = timedelta(hours=3, minutes=-5, seconds=13)
 
-    shift_capture_datetime([test_img_phone, test_img_camera, test_vid_gopro], datetime_shift)
+    shift_capture_datetime(
+        [test_img_phone, test_img_camera, test_vid_gopro], datetime_shift
+    )
     assert get_capture_datetime(test_img_phone) == expected_date_img_phone
     assert get_capture_datetime(test_img_camera) == expected_date_img_camera
     assert get_capture_datetime(test_vid_gopro) == expected_date_vid
@@ -358,7 +367,9 @@ def test_get_timezone_from_gps_coords_vid(test_vid_gopro):
     expected_timezone = timezone(timedelta(hours=+3))  # Madagascar
 
 
-def test_get_timezone_from_gps_coords_batch(test_img_phone, test_img_camera, test_vid_gopro):
+def test_get_timezone_from_gps_coords_batch(
+    test_img_phone, test_img_camera, test_vid_gopro
+):
     metadatas = extract_metadata_using_exiftool(
         [test_img_phone, test_img_camera, test_vid_gopro]
     )
@@ -482,3 +493,68 @@ def test_express_video_datetime_as_utc(test_vid_camera):
     assert photo_dt.minute == video_dt.minute
 
 
+def test_express_video_datetime_as_utc_vid_gopro(test_vid_gopro):
+    dt = get_capture_datetime(test_vid_gopro)
+    expected_datetime = datetime(2023, 6, 23, 16, 7, 15)
+    assert dt == expected_datetime
+    # This video has timezone = GMT+2.
+    assert get_timezone(test_vid_gopro) == timezone(timedelta(hours=2))
+
+    metadata = extract_metadata_using_exiftool(test_vid_gopro)
+
+    # We have two types of fields:
+    # 1. The fields that are encoded in local time by GoPro. This is typically
+    #    "QuickTime:CreateDate" and "QuickTime:ModifyDate".
+    # 2. The fields that are encoded in UTC by GoPro. There's only one:
+    #    "GoPro:GPSDateTime".
+    # Let's first verify that these two datetimes are currently not the same.
+
+    # Local timezone:
+    video_field = ExifDateTimeField("QuickTime:ModifyDate")
+    assert video_field in VIDEO_DATETIME_FIELDS
+    video_dt = video_field.parse(metadata[video_field.name])
+    assert video_dt == expected_datetime
+
+    # UTC timezone:
+    video_field = ExifDateTimeField(
+        "GoPro:GPSDateTime",
+        has_timezone_info=False,
+        is_utc=True,
+        has_millisecond_info=True,
+        has_date_info=True,
+    )
+    assert video_field in VIDEO_DATETIME_FIELDS
+    video_dt = video_field.parse(metadata[video_field.name])
+    assert datetime_approx_equal(
+        video_dt, datetime(2023, 6, 23, 14, 7, 15)
+    )  # expressed in UTC.
+
+    # Now using the function to ensure that *everything* is expressed in UTC.
+    # This is the behavior expected by Google Photos. Synology has a different behavior
+    # that we can't control (it relies on Exiftool's -api QuickTimeUTC option, which itself
+    # relies on the timestamp of the host NAS).
+    express_video_datetime_as_utc(test_vid_gopro)
+    metadata = extract_metadata_using_exiftool(test_vid_gopro)
+
+    # Doing exactly the same checks as previously:
+    # Local timezone:
+    video_field = ExifDateTimeField("QuickTime:ModifyDate")
+    video_dt = video_field.parse(metadata[video_field.name])
+    assert video_dt == datetime(
+        2023, 6, 23, 14, 7, 15
+    )  # Is now expressed in UTC as well.
+
+    # UTC timezone. Should be unchanged.
+    video_field = ExifDateTimeField(
+        "GoPro:GPSDateTime",
+        has_timezone_info=False,
+        is_utc=True,
+        has_millisecond_info=True,
+        has_date_info=True,
+    )
+    assert video_field in VIDEO_DATETIME_FIELDS
+    video_dt = video_field.parse(metadata[video_field.name])
+    assert datetime_approx_equal(video_dt, datetime(2023, 6, 23, 14, 7, 15))
+
+    # In the case of GoPro videos, the timezone can always be inferred from the GPS
+    # coordinates.

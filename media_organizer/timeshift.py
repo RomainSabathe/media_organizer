@@ -112,7 +112,14 @@ VIDEO_DATETIME_FIELDS = [
     ExifDateTimeField("QuickTime:TrackModifyDate"),
     ExifDateTimeField("QuickTime:MediaCreateDate"),
     ExifDateTimeField("QuickTime:MediaModifyDate"),
-    ExifDateTimeField("QuickTime:UTC", has_timezone_info=True, is_utc=False),
+    ExifDateTimeField("QuickTime:UTC"),
+    ExifDateTimeField(
+        "GoPro:GPSDateTime",
+        has_timezone_info=False,
+        is_utc=True,
+        has_millisecond_info=True,
+        has_date_info=True,
+    ),
 ]
 DATETIME_FIELDS = PHOTO_DATETIME_FIELDS + VIDEO_DATETIME_FIELDS
 
@@ -550,7 +557,7 @@ def set_timezone(
             # substitution feature.
             # Again, the line is hard to read because of the escaping, but it's
             # basically:
-            # e.g. "-XMP:DateTimeDigitized<${XP:DateTimeDigitized;s/\+00:00/+08:00/}"
+            # e.g. "-XMP:DateTimeDigitized<${XMP:DateTimeDigitized;s/\+00:00/+08:00/}"
             # TODO: what happens if the timezone info is not "+00:00"?
             arg = (
                 f"-{field.name}<$"
@@ -562,9 +569,6 @@ def set_timezone(
             )
             arg = f"-{field.name}<$" + "{createdate}" + timezone_str
             exiftool_cmd.append(arg)
-
-    exiftool_cmd.append("-api")
-    exiftool_cmd.append("-QuickTimeUTC=1")
 
     if not create_backups:
         exiftool_cmd.append("-overwrite_original")

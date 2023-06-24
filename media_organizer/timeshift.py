@@ -702,6 +702,7 @@ def shift_capture_datetime_to_target(
     file_paths: Union[Path, str, List[Union[Path, str]]],
     reference_img: Union[Path, str],
     target_time: Union[time, datetime],
+    create_backups: bool = True,
 ):
     """Computes the timedelta between the capture datetime of the reference file
     and the target and applies this delta to the filepaths.
@@ -727,4 +728,4 @@ def shift_capture_datetime_to_target(
         target_time = target_time.replace(second=ref_datetime.second)
     delta = target_time - ref_datetime
 
-    shift_capture_datetime(file_paths, delta)
+    shift_capture_datetime(file_paths, delta, create_backups=create_backups)

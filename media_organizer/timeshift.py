@@ -173,7 +173,7 @@ def extract_metadata_using_exiftool(
 
         # -ee = ExtractEmbedded. Allows to extract metadata from embedded files (e.g. XMP in JPEG)
         exiftool_args = ["-ee", *file_paths_as_str]
-        print(f"Running exiftool with args: {exiftool_args}")
+        #print(f"Running exiftool with args: {exiftool_args}")
         metadatas = et.execute_json(*exiftool_args)
         if len(metadatas) != len(file_paths):
             raise ValueError(
@@ -414,7 +414,9 @@ def capture_datetimes_are_consistent(
     return True
 
 
-def express_video_datetime_as_utc(file_path: Path, errors: str = "raise"):
+def express_video_datetime_as_utc(
+    file_path: Path, errors: str = "raise", create_backups: bool = True
+) -> None:
     metadata = extract_metadata_using_exiftool(file_path)
     timezone = get_timezone(file_path, metadata=metadata)
     if timezone is None:
@@ -425,7 +427,12 @@ def express_video_datetime_as_utc(file_path: Path, errors: str = "raise"):
         timezone = datetime.utcnow().astimezone().tzinfo
 
     offset = -timezone.utcoffset(datetime.now())
-    shift_capture_datetime(file_path, offset, exif_fields=VIDEO_DATETIME_FIELDS)
+    shift_capture_datetime(
+        file_path,
+        offset,
+        exif_fields=VIDEO_DATETIME_FIELDS,
+        create_backups=create_backups,
+    )
 
 
 @handle_single_or_list(is_file_path=True)

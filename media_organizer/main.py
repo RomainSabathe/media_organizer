@@ -10,25 +10,36 @@ from media_organizer.timeshift import (
 from media_organizer.rename import search_and_rename
 
 class LogFile:
-    def __init__(self, root_dir):
+    def __init__(self, root_dir, flush_frequency=5):
         self.root_dir = Path(root_dir)
         # create the directory if it doesn't exist
         self.root_dir.mkdir(parents=True, exist_ok=True)
 
         now = datetime.now()
         # use the current datetime as the filename
-        self.filename = self.root_dir / (now.isoformat() + '.log')
+        self.filename = self.root_dir / (now.isoformat() + ".log")
+
+        self.flush_frequency = flush_frequency
+        self.write_count = 0
 
     def __enter__(self):
         # open the file in write mode
-        self.file = self.filename.open('w')
+        self.file = self.filename.open("w")
         return self
 
     def write(self, text):
         # add a newline character after each write
-        self.file.write(text + '\n')
+        self.file.write(text + "\n")
+        self.write_count += 1
+
+        # if the number of writes has reached the flush frequency, flush the buffer and reset the counter
+        if self.write_count == self.flush_frequency:
+            self.file.flush()
+            self.write_count = 0
 
     def __exit__(self, exc_type, exc_value, traceback):
+        # make sure the buffer is flushed before closing the file
+        self.file.flush()
         # close the file
         if self.file:
             self.file.close()

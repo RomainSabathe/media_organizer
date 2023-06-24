@@ -11,6 +11,9 @@ from media_organizer.rename import search_and_rename
 def main():
     root_dir = Path("C:/Users/RSaba/Pictures/20230422")
     file_paths = list(root_dir.glob("*mp4"))
+    if len(file_paths) == 0:
+        print(f"No files found at {root_dir}")
+        return
     shift_capture_datetime(file_paths, timedelta(minutes=-30))
     search_and_rename(
         root_dir,
